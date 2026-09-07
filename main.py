@@ -23,7 +23,7 @@ app.mount("/assets", StaticFiles(directory="."), name="assets")
 def serve_html():
     return FileResponse("index.html")
     
-    @app.get("/app.js")
+@app.get("/app.js")
 def serve_js():
     return FileResponse("app.js")
 
