@@ -13,46 +13,60 @@
             --text-primary: #ffffff; --text-secondary: #94a3b8;
             --border: rgba(255, 255, 255, 0.08);
         }
-        /* Темы */
         body[data-theme="red"] { --accent-main: #ef4444; --accent-grad1: #7f1d1d; --accent-grad2: #dc2626; --bg-body: #1a0505; --bg-card: #2a0a0a; --bg-inner: #3f0f0f; }
         body[data-theme="purple"] { --accent-main: #a855f7; --accent-grad1: #4c1d95; --accent-grad2: #9333ea; --bg-body: #0f071a; --bg-card: #1b0c30; --bg-inner: #2e154f; }
         body[data-theme="pink"] { --accent-main: #ec4899; --accent-grad1: #831843; --accent-grad2: #db2777; --bg-body: #1a0812; --bg-card: #2f0e20; --bg-inner: #4a1532; }
         body[data-theme="neon"] { --accent-main: #06b6d4; --accent-grad1: #083344; --accent-grad2: #0284c7; --bg-body: #020617; --bg-card: #0f172a; --bg-inner: #1e293b; }
         body[data-theme="joke"] { --accent-main: #eab308; --accent-grad1: #713f12; --accent-grad2: #ca8a04; --bg-body: #1c1917; --bg-card: #292524; --bg-inner: #44403c; }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; transition: background 0.3s, border-color 0.3s; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-body); color: var(--text-primary); padding: 12px 14px 80px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; transition: background 0.3s ease, border-color 0.3s ease; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-body); color: var(--text-primary); padding: 12px 14px 80px; overflow-x: hidden; }
         
-        /* Анимации */
-        .fade-in { animation: fadeIn 0.3s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Плавные анимации 0.3s для свайпов и меню */
+        .view {
+            opacity: 0; transform: translateX(20px); pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            position: absolute; width: calc(100% - 28px); top: 12px; left: 14px; visibility: hidden;
+        }
+        .view.active { opacity: 1; transform: translateX(0); pointer-events: auto; position: relative; top: 0; left: 0; visibility: visible; }
+
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            width: 100%; max-width: 440px; background: var(--bg-card); border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border);
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .modal.active .modal-content { transform: translateY(0); }
 
         .container { width: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
-        .banner { background: linear-gradient(135deg, var(--accent-grad1), var(--accent-grad2)); border-radius: 18px; padding: 18px; position: relative; overflow: hidden; }
+        .banner { background: linear-gradient(135deg, var(--accent-grad1), var(--accent-grad2)); border-radius: 18px; padding: 18px; }
         .card { background: var(--bg-card); border-radius: 18px; padding: 18px; border: 1px solid var(--border); }
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; text-align: center; }
         .btn:active { transform: scale(0.97); }
-        .btn.primary { grid-column: span 2; background: linear-gradient(135deg, var(--accent-grad2), var(--accent-grad1)); font-size: 15px; border: none; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-        /* Модалки */
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: none; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; transition: opacity 0.3s; }
-        .modal.active { display: flex; opacity: 1; }
-        .modal-content { width: 100%; max-width: 440px; background: var(--bg-card); border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        .modal.active .modal-content { transform: translateY(0); }
+        .btn.primary { background: linear-gradient(135deg, var(--accent-grad2), var(--accent-grad1)); font-size: 15px; border: none; }
+        .btn.danger { background: #dc2626; border: none; }
+        .btn:disabled { opacity: 0.5; pointer-events: none; }
 
         .input-box { width: 100%; background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; color: #fff; margin-bottom: 10px; outline: none; }
         .pill { background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; }
         .pill.active { border-color: var(--accent-main); background: rgba(255,255,255,0.05); }
 
         /* Чаты */
-        .chat-box { height: 65vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; }
+        .chat-box { height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; scroll-behavior: smooth; }
         .msg { max-width: 80%; padding: 10px 14px; font-size: 13.5px; }
         .msg.left { align-self: flex-start; background: var(--bg-inner); border-radius: 0 14px 14px 14px; }
         .msg.right { align-self: flex-end; background: var(--accent-main); border-radius: 14px 0 14px 14px; }
-        .chat-item { background: var(--bg-inner); padding: 12px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; font-weight: 600; }
+        
+        /* Вкладки админки */
+        .admin-tabs { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; }
+        .atab { padding: 8px 12px; background: var(--bg-inner); border-radius: 8px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        .atab.active { background: var(--accent-main); }
 
         .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; }
         .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -64,10 +78,10 @@
 
 <div class="container">
     <!-- КАБИНЕТ -->
-    <div id="view-home" class="view fade-in">
+    <div id="view-home" class="view active">
         <div class="banner">
             <h2 style="font-size: 20px;">SwapPay</h2>
-            <select id="theme-select" onchange="changeTheme()" style="position:absolute; right:15px; top:20px; background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:4px;">
+            <select id="theme-select" onchange="changeTheme()" style="position:absolute; right:15px; top:20px; background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:4px; outline:none;">
                 <option value="basic">Базовая</option>
                 <option value="red">Красный градиент</option>
                 <option value="purple">Фиолетовая</option>
@@ -76,7 +90,6 @@
                 <option value="joke">Угарная</option>
             </select>
         </div>
-
         <div class="card">
             <div style="display: flex; justify-content: space-between;">
                 <span style="font-size: 12px; color: var(--text-secondary);">БАЛАНС</span>
@@ -85,19 +98,17 @@
             <div style="font-size: 32px; font-weight: 800;"><span id="bal-rub">0.00</span> <span style="color:var(--accent-main);">₽</span></div>
             <div style="font-size: 12px; color: var(--text-secondary);">Бонусы: <b id="bal-bonus" style="color:#10b981;">0.00 ₽</b></div>
         </div>
-
         <div class="grid-2">
-            <button class="btn primary" onclick="openModal('modal-deposit')">💳 Пополнить</button>
-            <button class="btn" onclick="openModal('modal-purchase')">🛍 Оплатить</button>
-            <button class="btn" onclick="openModal('modal-ref')">👥 Рефералы</button>
-            <button class="btn primary" onclick="openModal('modal-promo')">🎁 Промокод</button>
+            <button class="btn primary" onclick="openModal('modal-deposit')" style="grid-column: span 2;">💳 Пополнить</button>
+            <button class="btn" onclick="openModal('modal-purchase')">🛍 Оплатить / USDT</button>
+            <button class="btn" onclick="openModal('modal-promo')">🎁 Промокод</button>
         </div>
     </div>
 
-    <!-- ЧАТ С ПОДДЕРЖКОЙ (ЮЗЕР) -->
-    <div id="view-support" class="view hidden fade-in">
+    <!-- ЧАТ ПОДДЕРЖКИ (ЮЗЕР) -->
+    <div id="view-support" class="view">
         <div class="card">
-            <h3>Чат с поддержкой</h3>
+            <h3 id="sup-status">Чат с поддержкой</h3>
             <div class="chat-box" id="user-chat-box"></div>
             <div style="display: flex; gap: 8px; margin-top: 10px;">
                 <input type="text" id="user-chat-input" class="input-box" style="margin:0;" placeholder="Сообщение...">
@@ -106,16 +117,29 @@
         </div>
     </div>
 
-    <!-- АДМИН ПАНЕЛЬ ПОДДЕРЖКИ -->
-    <div id="view-admin" class="view hidden fade-in">
+    <!-- АДМИН ПАНЕЛЬ -->
+    <div id="view-admin" class="view">
         <div class="card">
-            <h3>Список обращений</h3>
-            <div id="admin-chat-list" style="margin-top: 10px; max-height: 40vh; overflow-y: auto;"></div>
+            <div class="admin-tabs">
+                <div class="atab active" onclick="switchAdminTab('chats')">Чаты</div>
+                <div class="atab" onclick="switchAdminTab('promo')">Промокоды</div>
+            </div>
+            
+            <div id="admin-sec-chats">
+                <h3>Активные обращения</h3>
+                <div id="admin-chat-list" style="margin-top: 10px; max-height: 50vh; overflow-y: auto; display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+
+            <div id="admin-sec-promo" class="hidden">
+                <input type="text" id="p-code" class="input-box" placeholder="КОД (PROMO100)">
+                <input type="number" id="p-amt" class="input-box" placeholder="Сумма ₽">
+                <button class="btn primary" style="width:100%" onclick="adminCreatePromo()">Создать</button>
+            </div>
         </div>
     </div>
 
-    <!-- АДМИН ЧАТ С КОНКРЕТНЫМ ЮЗЕРОМ -->
-    <div id="view-admin-chat" class="view hidden fade-in">
+    <!-- АДМИН: ЧАТ С ЮЗЕРОМ -->
+    <div id="view-admin-chat" class="view">
         <div class="card">
             <button class="btn" style="padding: 5px 10px; margin-bottom: 10px;" onclick="switchTab('admin')">🔙 Назад</button>
             <h3 id="admin-chat-title">Чат</h3>
@@ -124,73 +148,57 @@
                 <input type="text" id="admin-chat-input" class="input-box" style="margin:0;">
                 <button class="btn primary" style="padding: 0 15px;" onclick="sendMsgAdmin()">➤</button>
             </div>
+            <div class="grid-2" style="margin-top: 10px;">
+                <button class="btn primary" style="font-size:12px; padding:10px;" onclick="closeSupportAdmin('resolved')">✅ Решено</button>
+                <button class="btn danger" style="font-size:12px; padding:10px;" onclick="closeSupportAdmin('dm')">✉️ Перевести в ЛС</button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- МОДАЛКА: ДЕПОЗИТ -->
+<!-- МОДАЛКИ -->
 <div class="modal" id="modal-deposit">
     <div class="modal-content">
         <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <h3>Пополнение</h3> <span onclick="closeModal('modal-deposit')" style="cursor:pointer;">✕</span>
+            <h3>Пополнение</h3> <span onclick="closeModal('modal-deposit')" style="cursor:pointer; font-size:20px;">✕</span>
         </div>
-        <div id="dep-step-1">
-            <div class="pill active" onclick="setDep(this, 'crypto')">💎 CryptoBot (+40%)</div>
-            <div class="pill" onclick="setDep(this, 'kaspi')">🇰🇿 Kaspi Bank</div>
-            <div class="pill" onclick="setDep(this, 'mono')">🇺🇦 Monobank</div>
-            <input type="number" id="dep-amt" class="input-box" placeholder="Сумма в рублях (мин 100)" oninput="calcDep()">
-            <div id="dep-hint" style="font-size: 12px; color: var(--accent-main); margin-bottom: 10px;"></div>
-            <button class="btn primary" style="width: 100%;" onclick="depNext()">Далее</button>
+        <div class="pill active" onclick="setDep(this, 'crypto')">💎 CryptoBot (+40%)</div>
+        <div class="pill" onclick="setDep(this, 'kaspi')">🇰🇿 Kaspi Bank</div>
+        <div class="pill" onclick="setDep(this, 'mono')">🇺🇦 Monobank</div>
+        
+        <input type="number" id="dep-amt" class="input-box" placeholder="Сумма в рублях" oninput="calcDep()">
+        <div id="dep-hint" style="font-size: 12px; color: var(--accent-main); margin-bottom: 10px;"></div>
+        
+        <div id="dep-file-box" class="hidden" style="margin-bottom: 15px;">
+            <input type="file" id="dep-file" accept="application/pdf" style="display:none;" onchange="document.getElementById('dep-file-label').innerText = '✅ ' + this.files[0].name">
+            <div class="btn" style="border: 2px dashed rgba(255,255,255,0.2);" onclick="document.getElementById('dep-file').click()" id="dep-file-label">📄 Прикрепить чек (.PDF)</div>
         </div>
-        <div id="dep-step-2" class="hidden">
-            <p style="font-size: 14px; margin-bottom: 10px;" id="dep-confirm-txt"></p>
-            <div id="dep-file-box" class="hidden" style="margin-bottom: 15px;">
-                <input type="file" id="dep-file" accept="application/pdf" style="display:none;" onchange="document.getElementById('dep-file-label').innerText = '✅ ' + this.files[0].name">
-                <div class="btn" onclick="document.getElementById('dep-file').click()" id="dep-file-label">📄 Прикрепить PDF чек</div>
-            </div>
-            <button class="btn primary" id="btn-dep-submit" style="width: 100%;" onclick="depSubmit()">Подтверждаю оплату</button>
-            <button class="btn" style="width: 100%; margin-top: 8px;" onclick="document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-step-2').classList.add('hidden');">Назад</button>
-        </div>
+        <button class="btn primary" id="btn-dep-submit" style="width: 100%;" onclick="depSubmit()">Перейти к оплате</button>
     </div>
 </div>
 
-<!-- МОДАЛКА: ПРОМОКОД -->
-<div class="modal" id="modal-promo">
-    <div class="modal-content">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <h3>Активация промокода</h3> <span onclick="closeModal('modal-promo')">✕</span>
-        </div>
-        <input type="text" id="promo-val" class="input-box" placeholder="Введите код">
-        <button class="btn primary" id="btn-promo" style="width: 100%;" onclick="activatePromo()">Активировать</button>
-    </div>
-</div>
-
-<!-- МОДАЛКА: РЕФЕРАЛЫ -->
-<div class="modal" id="modal-ref">
-    <div class="modal-content">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <h3>Реферальная программа</h3> <span onclick="closeModal('modal-ref')">✕</span>
-        </div>
-        <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-size: 32px; font-weight: 800;" id="ref-count">0</div>
-            <div style="font-size: 12px; color: var(--text-secondary);">Приглашенных друзей</div>
-        </div>
-        <input type="text" id="ref-link" class="input-box" readonly>
-        <button class="btn primary" style="width: 100%;" onclick="navigator.clipboard.writeText(document.getElementById('ref-link').value); alert('Скопировано!')">Скопировать ссылку</button>
-    </div>
-</div>
-
-<!-- МОДАЛКА: ОПЛАТА / ПОКУПКА -->
 <div class="modal" id="modal-purchase">
     <div class="modal-content">
         <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <h3>Оплата услуги</h3> <span onclick="closeModal('modal-purchase')">✕</span>
+            <h3>Оплата / USDT</h3> <span onclick="closeModal('modal-purchase')" style="cursor:pointer; font-size:20px;">✕</span>
         </div>
-        <input type="number" id="pur-amt" class="input-box" placeholder="Сумма к списанию (₽)">
-        <textarea id="pur-desc" class="input-box" placeholder="Ссылка на товар или реквизиты" style="height: 60px;"></textarea>
-        <input type="file" id="pur-photo" accept="image/*" style="display:none;" onchange="document.getElementById('pur-photo-label').innerText = '✅ Фото загружено'">
-        <div class="btn" style="margin-bottom: 10px;" onclick="document.getElementById('pur-photo').click()" id="pur-photo-label">📸 Прикрепить фото (опционально)</div>
-        <button class="btn primary" id="btn-pur" style="width: 100%;" onclick="submitPurchase()">Создать заявку</button>
+        <select id="pur-type" class="input-box" onchange="document.getElementById('pur-desc').placeholder = this.value === 'usdt' ? 'Адрес TRC-20 (начинается с T)' : 'Ссылка или реквизиты услуги'">
+            <option value="service">🛍 Оплатить товар/услугу</option>
+            <option value="usdt">💎 Купить USDT (TRC-20)</option>
+        </select>
+        <input type="number" id="pur-amt" class="input-box" placeholder="Сумма в ₽ (снимет с баланса)">
+        <textarea id="pur-desc" class="input-box" placeholder="Ссылка или реквизиты услуги" style="height: 60px;"></textarea>
+        <button class="btn primary" id="btn-pur" style="width: 100%;" onclick="submitPurchase()">Оплатить</button>
+    </div>
+</div>
+
+<div class="modal" id="modal-promo">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+            <h3>Промокод</h3> <span onclick="closeModal('modal-promo')" style="cursor:pointer; font-size:20px;">✕</span>
+        </div>
+        <input type="text" id="promo-val" class="input-box" placeholder="Введите код">
+        <button class="btn primary" id="btn-promo" style="width: 100%;" onclick="activatePromo()">Активировать</button>
     </div>
 </div>
 
