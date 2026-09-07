@@ -10,271 +10,141 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-body: #0d121a;
-            --bg-card: #151d28;
-            --bg-card-inner: #1c2635;
-            --bg-btn-hover: #2a3a50;
-            --accent-blue: #3a86ff;
-            --accent-green: #00e676;
+            --bg-body: #0a0e17;
+            --bg-card: #131b26;
+            --bg-inner: #1a2536;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-purple: #6366f1;
+            --accent-cyan: #06b6d4;
             --text-primary: #ffffff;
-            --text-secondary: #8a99ad;
-            --border-subtle: rgba(255, 255, 255, 0.08);
-            --shadow-glow: 0 8px 32px rgba(0, 0, 0, 0.35);
+            --text-secondary: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0; padding: 0;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-primary);
-            padding: 12px 14px 90px 14px;
+            padding: 12px 14px 80px 14px;
             display: flex;
             justify-content: center;
         }
 
-        .container {
-            width: 100%;
-            max-width: 440px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
+        .container { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 12px; }
 
-        .hero-banner {
-            background: linear-gradient(135deg, #1d3557 0%, #2a5298 60%, #1e3c72 100%);
-            border-radius: 20px;
-            padding: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+        .banner {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            border-radius: 18px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.1);
         }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(0, 0, 0, 0.25);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-bottom: 8px;
+        .banner-tag {
+            display: inline-block; background: rgba(0,0,0,0.3);
+            padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-bottom: 6px;
         }
-
-        .hero-badge .dot {
-            width: 6px; height: 6px;
-            background: var(--accent-green);
-            border-radius: 50%;
-        }
-
-        .hero-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
-        .hero-sub { font-size: 12px; color: rgba(255, 255, 255, 0.8); }
 
         .wallet-card {
             background: var(--bg-card);
-            border-radius: 20px;
-            padding: 20px;
-            border: 1px solid var(--border-subtle);
-            box-shadow: var(--shadow-glow);
+            border-radius: 18px;
+            padding: 18px;
+            border: 1px solid var(--border);
         }
+        .wallet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .balance-num { font-size: 32px; font-weight: 800; }
+        .balance-num span { color: var(--accent-blue); }
 
-        .wallet-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .wallet-header-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-        }
-
-        .user-tag {
-            font-size: 11px;
-            color: var(--accent-blue);
-            background: rgba(58, 134, 255, 0.12);
-            padding: 4px 8px;
-            border-radius: 8px;
-            font-weight: 700;
-        }
-
-        .balance-main {
-            font-size: 34px;
-            font-weight: 800;
-            display: flex;
-            align-items: baseline;
-            gap: 6px;
-        }
-
-        .currency-symbol { color: var(--accent-blue); font-size: 26px; }
-
-        .balance-bonus {
-            display: flex;
-            gap: 6px;
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-top: 6px;
-        }
-
-        .balance-bonus strong { color: var(--accent-green); }
-
-        .action-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .btn-action {
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-card {
             background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            padding: 14px 12px;
+            border: 1px solid var(--border);
             border-radius: 14px;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 13.5px;
+            padding: 14px;
+            color: #fff;
             font-weight: 600;
+            font-size: 13.5px;
             cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
         }
-
-        .btn-action:active { background: var(--bg-btn-hover); transform: scale(0.98); }
-
-        .btn-action.primary {
+        .btn-card.primary {
             grid-column: span 2;
-            background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
             justify-content: center;
             font-size: 15px;
-            font-weight: 700;
             padding: 15px;
         }
 
-        /* Модальные окна */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(8px);
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
+        /* МОДАЛКА */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center; z-index: 100;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            width: 100%; max-width: 440px; background: #131d2b;
+            border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border);
+            max-height: 90vh; overflow-y: auto;
         }
 
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .pill-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .pill {
+            background: var(--bg-inner); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px; cursor: pointer; display: flex; justify-content: space-between;
+        }
+        .pill.active { border-color: var(--accent-blue); background: rgba(59,130,246,0.15); }
 
-        .modal-sheet {
-            width: 100%;
-            max-width: 440px;
-            background: #17212b;
-            border-radius: 24px 24px 0 0;
-            border: 1px solid var(--border-subtle);
-            padding: 20px;
-            max-height: 85vh;
-            overflow-y: auto;
-            transform: translateY(100%);
-            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        .input-box {
+            width: 100%; background: #0c131e; border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px; color: #fff; font-size: 14px; margin-bottom: 10px;
+        }
+        .btn-action {
+            width: 100%; padding: 13px; background: var(--accent-blue);
+            color: #fff; border-radius: 12px; border: none; font-weight: 700; cursor: pointer;
         }
 
-        .modal-overlay.active .modal-sheet { transform: translateY(0); }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
+        /* ЗОНА ЗАГРУЗКИ PDF */
+        .upload-zone {
+            border: 2px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 16px;
+            text-align: center; cursor: pointer; margin-bottom: 12px; background: rgba(0,0,0,0.2);
         }
 
-        .modal-close {
-            width: 28px; height: 28px;
-            background: var(--bg-card-inner);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--text-secondary);
+        /* ЧАТ ПОДДЕРЖКИ ПО СКЕТЧУ */
+        .chat-container {
+            display: flex; flex-direction: column; height: 75vh;
+            background: var(--bg-card); border-radius: 18px; border: 1px solid var(--border); padding: 14px;
+        }
+        .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 10px; }
+        
+        /* Сообщение оператора (слева) */
+        .msg-operator { align-self: flex-start; max-width: 80%; }
+        .msg-operator .tag {
+            background: #0284c7; color: #fff; font-size: 11px; font-weight: 800;
+            padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 4px;
+        }
+        .msg-operator .bubble {
+            background: #475569; color: #fff; padding: 10px 14px; border-radius: 0 14px 14px 14px; font-size: 13.5px;
         }
 
-        .methods-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-
-        .method-pill {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px;
-            background: var(--bg-card-inner);
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            cursor: pointer;
+        /* Сообщение юзера (справа) */
+        .msg-user { align-self: flex-end; max-width: 80%; display: flex; flex-direction: column; align-items: flex-end; }
+        .msg-user .tag {
+            background: #6366f1; color: #fff; font-size: 11px; font-weight: 800;
+            padding: 4px 10px; border-radius: 6px; display: inline-block; margin-bottom: 4px;
+        }
+        .msg-user .bubble {
+            background: #0891b2; color: #fff; padding: 10px 14px; border-radius: 14px 0 14px 14px; font-size: 13.5px;
         }
 
-        .method-pill.active {
-            border-color: var(--accent-blue);
-            background: rgba(58, 134, 255, 0.1);
+        .chat-input-bar { display: flex; gap: 8px; margin-top: 10px; }
+
+        /* НАВИГАЦИЯ */
+        .nav {
+            position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10, 14, 23, 0.95);
+            backdrop-filter: blur(10px); border-top: 1px solid var(--border); display: flex; justify-content: space-around;
+            padding: 10px 0; z-index: 50;
         }
-
-        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-        .input-group label { font-size: 12px; color: var(--text-secondary); }
-
-        .input-styled {
-            width: 100%;
-            background: var(--bg-body);
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            padding: 12px 14px;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 14px;
-            background: var(--accent-blue);
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        /* Навигация админа */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: rgba(21, 29, 40, 0.95);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid var(--border-subtle);
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 14px;
-            z-index: 50;
-        }
-
-        .nav-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 600;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-        }
-
+        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; }
         .nav-btn.active { color: var(--accent-blue); }
         .hidden { display: none !important; }
     </style>
@@ -282,113 +152,144 @@
 <body>
 
 <div class="container">
-    <div id="view-user" class="view">
-        <div class="hero-banner">
-            <div class="hero-badge"><div class="dot"></div>SwapPay Official</div>
-            <div class="hero-title">Быстрый обмен</div>
-            <div class="hero-sub">Kaspi Bank, Monobank и CryptoBot онлайн</div>
+    <!-- ВКЛАДКА 1: КАБИНЕТ -->
+    <div id="tab-home" class="view">
+        <div class="banner">
+            <div class="banner-tag">SWAPPAY OFFICIAL</div>
+            <h2 style="font-size: 20px;">Быстрый обмен</h2>
+            <p style="font-size: 12px; opacity: 0.8;">Kaspi • Monobank • CryptoBot</p>
         </div>
 
-        <div style="height: 14px;"></div>
+        <div style="height: 12px;"></div>
 
         <div class="wallet-card">
             <div class="wallet-header">
-                <div class="wallet-header-title">Виртуальный счет</div>
-                <div class="user-tag" id="user-role-badge">USER</div>
+                <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">БАЛАНС</span>
+                <span id="user-role-badge" style="background: rgba(59,130,246,0.2); color: var(--accent-blue); padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700;">USER</span>
             </div>
-
-            <div class="balance-main">
-                <span id="balance">0.00</span>
-                <span class="currency-symbol">₽</span>
-            </div>
-
-            <div class="balance-bonus">
-                <span>Бонусный баланс:</span>
-                <strong id="bonus-balance">0.00 ₽</strong>
+            <div class="balance-num"><span id="balance-val">0.00</span> <span>₽</span></div>
+            <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                Бонусы: <strong id="bonus-val" style="color: var(--accent-green);">0.00 ₽</strong>
             </div>
         </div>
 
-        <div style="height: 14px;"></div>
+        <div style="height: 12px;"></div>
 
-        <div class="action-grid">
-            <button class="btn-action primary" onclick="openDepositModal()">
-                <span>💳</span> Пополнить баланс
-            </button>
-            <button class="btn-action" onclick="alert('Раздел покупки открывается')">
-                <span>🛍</span> Купить / Оплатить
-            </button>
-            <button class="btn-action" onclick="alert('Рефералы')">
-                <span>👥</span> Рефералы
-            </button>
-            <button class="btn-action" onclick="alert('Промокоды')">
-                <span>🎁</span> Промокод
-            </button>
-            <button class="btn-action" style="grid-column: span 2;" onclick="alert('Чат поддержки')">
-                <span>💬</span> Поддержка сервиса
-            </button>
+        <div class="grid-2">
+            <button class="btn-card primary" onclick="openDeposit()">💳 Пополнить баланс</button>
+            <button class="btn-card" onclick="alert('Раздел покупки')">🛍 Купить / Оплатить</button>
+            <button class="btn-card" onclick="alert('Реферальная сеть')">👥 Рефералы</button>
+            <button class="btn-card" onclick="alert('Промокод')">🎁 Промокод</button>
+            <button class="btn-card" style="grid-column: span 2;" onclick="switchView('support')">💬 Поддержка сервиса</button>
         </div>
     </div>
 
-    <!-- Панель Администратора -->
-    <div id="view-admin" class="view hidden">
-        <div class="hero-banner" style="background: linear-gradient(135deg, #1f4037 0%, #004d40 100%);">
-            <div class="hero-badge">SUPER ADMIN</div>
-            <div class="hero-title">Панель управления</div>
-            <div class="hero-sub">ID: 7531770025 | Все права активны</div>
+    <!-- ВКЛАДКА 2: ЧАТ ПОДДЕРЖКИ (ПО ТВОЕМУ СКЕТЧУ) -->
+    <div id="tab-support" class="view hidden">
+        <div class="chat-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="font-size: 16px;">Чат с поддержкой</h3>
+                <button onclick="switchView('home')" style="background:none; border:none; color:var(--text-secondary); cursor:pointer;">✕ Закрыть</button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <!-- Сообщение оператора (слева) -->
+                <div class="msg-operator">
+                    <div class="tag">ОПЕРАТОР</div>
+                    <div class="bubble">Здравствуйте! Чем можем помочь?</div>
+                </div>
+            </div>
+            <div class="chat-input-bar">
+                <input type="text" id="support-input" class="input-box" style="margin: 0;" placeholder="Введите ваше сообщение...">
+                <button class="btn-action" style="width: 80px;" onclick="sendSupportMessage()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ВКЛАДКА 3: АДМИН-ПАНЕЛЬ -->
+    <div id="tab-admin" class="view hidden">
+        <div class="banner" style="background: linear-gradient(135deg, #065f46 0%, #047857 100%);">
+            <div class="banner-tag">SUPER ADMIN</div>
+            <h2 style="font-size: 20px;">Панель управления</h2>
+            <p style="font-size: 12px; opacity: 0.8;">ID: 7531770025 | Все права активны</p>
         </div>
 
-        <div style="height: 14px;"></div>
+        <div style="height: 12px;"></div>
 
         <div class="wallet-card">
-            <div class="wallet-header-title" style="margin-bottom: 6px;">Управление системой</div>
-            <div style="font-size: 13px; color: var(--text-secondary);">
-                • Автоматический мониторинг CryptoBot запущен<br>
-                • Логирование в чат <code>-5401409248</code> активно
+            <div style="font-size: 13px; color: var(--text-secondary);">Оборот системы:</div>
+            <div class="balance-num" id="admin-turnover">0.00 <span>₽</span></div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">
+                Юзеров: <b id="admin-users-cnt">0</b> | Транзакций: <b id="admin-tx-cnt">0</b>
             </div>
+        </div>
+
+        <div style="height: 12px;"></div>
+
+        <div class="wallet-card">
+            <h4 style="margin-bottom: 8px;">Создать промокод</h4>
+            <input type="text" id="promo-code" class="input-box" placeholder="КОД (напр. PROMO500)">
+            <input type="number" id="promo-amount" class="input-box" placeholder="Сумма бонуса в ₽">
+            <button class="btn-action" onclick="createPromo()">Создать</button>
+        </div>
+
+        <div style="height: 12px;"></div>
+
+        <div class="wallet-card">
+            <h4 style="margin-bottom: 8px;">SQL Консоль</h4>
+            <textarea id="sql-query" class="input-box" style="height: 70px;" placeholder="SELECT * FROM users;"></textarea>
+            <button class="btn-action" onclick="runSql()">Выполнить SQL</button>
+            <pre id="sql-res" style="font-size: 11px; color: #a7f3d0; margin-top: 8px; overflow-x: auto;"></pre>
         </div>
     </div>
 </div>
 
-<!-- Модальное окно пополнения -->
-<div class="modal-overlay" id="modal-deposit">
-    <div class="modal-sheet">
-        <div class="modal-header">
-            <h3>Пополнение счета</h3>
-            <div class="modal-close" onclick="closeModals()">✕</div>
+<!-- МОДАЛКА ПОПОЛНЕНИЯ -->
+<div class="modal" id="modal-deposit">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3>Пополнение баланса</h3>
+            <span onclick="closeDeposit()" style="cursor: pointer; color: var(--text-secondary);">✕</span>
         </div>
-        <div class="methods-list">
-            <div class="method-pill" onclick="selectMethod(this, 'kaspi')">
-                <div>🇰🇿 <b>Kaspi Bank</b></div>
+
+        <div class="pill-group">
+            <div class="pill active" onclick="setMethod(this, 'crypto')">
+                <div>💎 <b>CryptoBot</b></div>
+                <div style="color: var(--accent-green); font-size: 12px;">+40% комиссия (Авто)</div>
+            </div>
+            <div class="pill" onclick="setMethod(this, 'kaspi')">
+                <div>🇰🇿 <b>Kaspi Bank (KZT)</b></div>
                 <div style="font-size: 12px; color: var(--text-secondary);">1 ₽ = 8.00 ₸</div>
             </div>
-            <div class="method-pill" onclick="selectMethod(this, 'mono')">
-                <div>🇺🇦 <b>Monobank</b></div>
+            <div class="pill" onclick="setMethod(this, 'mono')">
+                <div>🇺🇦 <b>Monobank (UAH)</b></div>
                 <div style="font-size: 12px; color: var(--text-secondary);">1 ₽ = 0.80 ₴</div>
             </div>
-            <div class="method-pill active" onclick="selectMethod(this, 'crypto')">
-                <div>💎 <b>CryptoBot</b></div>
-                <div style="font-size: 12px; color: var(--accent-green);">+40% комиссия (Авто)</div>
+        </div>
+
+        <label style="font-size: 12px; color: var(--text-secondary);">Сумма в рублях (₽):</label>
+        <input type="number" id="dep-amount" class="input-box" placeholder="Минимум 100 ₽" oninput="recalc()">
+
+        <div id="crypto-desc" style="font-size: 12px; color: var(--accent-blue); margin-bottom: 12px;">
+            К оплате: 0.00 ₽ (+40%)
+        </div>
+
+        <!-- Поле для PDF при Kaspi/Mono -->
+        <div id="pdf-section" class="hidden">
+            <div class="upload-zone" onclick="document.getElementById('pdf-file').click()">
+                <span id="pdf-name">📄 Прикрепить чек (только .PDF)</span>
+                <input type="file" id="pdf-file" accept="application/pdf" style="display:none;" onchange="fileChosen(this)">
             </div>
         </div>
 
-        <div class="input-group">
-            <label>Сумма начисления в рублях (₽):</label>
-            <input type="number" id="deposit-amount" class="input-styled" placeholder="Минимум 100 ₽" oninput="calcExchange()">
-            <div style="font-size: 12px; color: var(--accent-blue); margin-top: 4px;" id="deposit-calc">Сумма к оплате: 0.00 ₽ (с наценкой 40%)</div>
-        </div>
-
-        <button class="btn-submit" id="btn-deposit-submit" onclick="submitDeposit()">Перейти к оплате</button>
+        <button class="btn-action" id="btn-dep-action" onclick="handleDepositSubmit()">Перейти к оплате</button>
     </div>
 </div>
 
-<!-- Навигация для Админа -->
-<div class="bottom-nav hidden" id="admin-bottom-bar">
-    <button class="nav-btn active" id="btn-tab-user" onclick="switchTab('user')">
-        <span>👤</span> Кабинет
-    </button>
-    <button class="nav-btn" id="btn-tab-admin" onclick="switchTab('admin')">
-        <span>⚡️</span> Админка
-    </button>
+<!-- НИЖНЯЯ НАВИГАЦИЯ -->
+<div class="nav">
+    <button class="nav-btn active" id="nav-home" onclick="switchView('home')">👤 Кабинет</button>
+    <button class="nav-btn" id="nav-support" onclick="switchView('support')">💬 Чат</button>
+    <button class="nav-btn hidden" id="nav-admin" onclick="switchView('admin')">⚡️ Админка</button>
 </div>
 
 <script src="app.js"></script>
