@@ -186,7 +186,16 @@ async def tg_polling_worker():
                             
                             elif text.startswith("/start"):
                                 # Обновленная ссылка на @swapaapaaAPP_bot
-                                markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "url": WEBAPP_URL}]]}
+                               markup = {
+    "inline_keyboard": [
+        [
+            {
+                "text": "📱 Открыть SwapPay",
+                "web_app": {"url": "https://swappay-app.onrender.com"}
+            }
+        ]
+    ]
+}
                                 welcome_text = (
                                     "👋 <b>Добро пожаловать в SwapPay!</b>\n\n"
                                     "Мы помогаем оплачивать покупки на RU маркетплейсах, "
