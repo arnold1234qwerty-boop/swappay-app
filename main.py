@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 import httpx
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8695905699:AAH2i5C825HkRrS3bkgAMp-UOE-PxV4tB04")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8695905699:AAGuQ_PWRFPcBmnWBO6FsTmj3_FIygaRwww")
 CRYPTOBOT_TOKEN = "631597:AAKH5PkslQyUSTvJPyZTmtEaC0bMyo117NB"
 LOG_CHAT_ID = "-5401409248"
 SUPER_ADMIN_ID = 7531770025
