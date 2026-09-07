@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SwapPay</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #17212b);
+            --text-color: var(--tg-theme-text-color, #ffffff);
+            --hint-color: var(--tg-theme-hint-color, #708499);
+            --btn-color: var(--tg-theme-button-color, #5288c1);
+            --btn-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #232e3c);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card {
+            background-color: var(--secondary-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .balance-header { text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+        .bonus-balance { text-align: center; color: var(--hint-color); font-size: 14px; margin-bottom: 24px; }
+        .grid-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        button {
+            background-color: var(--btn-color);
+            color: var(--btn-text-color);
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+        .hidden { display: none; }
+        .nav-tabs { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; }
+        .nav-tab { flex: 1; padding: 10px; text-align: center; background: var(--secondary-bg); border-radius: 8px; cursor: pointer; }
+        .nav-tab.active { background: var(--btn-color); color: var(--btn-text-color); }
+        input {
+            width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px;
+            background: var(--bg-color); color: var(--text-color);
+            border: 1px solid var(--hint-color); border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Навигация (появляется только для Drop/Admin) -->
+        <div id="nav" class="nav-tabs hidden">
+            <div class="nav-tab active" onclick="switchTab('user')">Кабинет</div>
+            <div id="drop-tab" class="nav-tab hidden" onclick="switchTab('drop')">Заявки (Дроп)</div>
+            <div id="admin-tab" class="nav-tab hidden" onclick="switchTab('admin')">Админка</div>
+        </div>
+
+        <!-- Интерфейс пользователя -->
+        <div id="view-user">
+            <div class="card">
+                <div class="balance-header"><span id="balance">0</span> ₽</div>
+                <div class="bonus-balance">Бонусы: <span id="bonus-balance">0</span> ₽</div>
+                <div class="grid-buttons">
+                    <button onclick="openDeposit()">Пополнить</button>
+                    <button onclick="openBuy()">Купить / Оплатить</button>
+                    <button onclick="openCrypto()">Купить USDT</button>
+                    <button onclick="openReferrals()">Рефералы</button>
+                    <button onclick="openPromo()">Промокод</button>
+                    <button onclick="openSupport()">Поддержка</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Интерфейс дропа -->
+        <div id="view-drop" class="hidden">
+            <div class="card">
+                <h3>Ожидающие транзакции</h3>
+                <div id="drop-tx-list">Загрузка...</div>
+            </div>
+        </div>
+
+        <!-- Интерфейс админа -->
+        <div id="view-admin" class="hidden">
+            <div class="card">
+                <h3>Статистика</h3>
+                <div id="admin-stats">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
