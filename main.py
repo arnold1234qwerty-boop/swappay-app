@@ -16,7 +16,7 @@ import httpx
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN")
 LOG_CHAT_ID = os.getenv("LOG_CHAT_ID", "-5401409248")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/SwapPay_bot/app") # Замените на юзернейм вашего бота
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/SwapPay_bot/app") # Ссылка на твой WebApp
 SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 CRYPTO_RATE_MULTIPLIER = 1.4
@@ -89,6 +89,9 @@ def init_db():
     CREATE TABLE IF NOT EXISTS reviews (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
+        tx_id INTEGER,
+        stars INTEGER DEFAULT 5,
+        amount_rub REAL,
         text TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -101,16 +104,24 @@ def init_db():
     conn.commit()
     conn.close()
 
+async def send_error_log(err_msg: str):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": LOG_CHAT_ID, "text": f"⚠️ <b>ОШИБКА БОТА:</b>\n<pre>{err_msg[:3500]}</pre>", "parse_mode": "HTML"}
+    try:
+        async with httpx.AsyncClient() as client: await client.post(url, json=payload)
+    except Exception: pass
+
 async def send_tg_message(chat_id, text: str, reply_markup=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
     if reply_markup: payload["reply_markup"] = reply_markup
     try:
-        async with httpx.AsyncClient() as client: await client.post(url, json=payload)
-    except Exception: pass
-
-async def send_error_log(err_msg: str):
-    await send_tg_message(LOG_CHAT_ID, f"⚠️ <b>КРИТИЧЕСКАЯ ОШИБКА БОТА:</b>\n<pre>{err_msg[:3500]}</pre>")
+        async with httpx.AsyncClient() as client: 
+            resp = await client.post(url, json=payload)
+            if resp.status_code != 200:
+                await send_error_log(f"Ошибка отправки сообщения юзеру {chat_id}: {resp.text}")
+    except Exception as e: 
+        await send_error_log(f"Сбой сети при отправке сообщения: {e}")
 
 async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: str, reply_markup=None, is_photo=False):
     endpoint = "sendPhoto" if is_photo else "sendDocument"
@@ -120,7 +131,7 @@ async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: s
         data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
         if reply_markup: data["reply_markup"] = json.dumps(reply_markup)
         async with httpx.AsyncClient(timeout=20.0) as client: await client.post(url, data=data, files=files)
-    except Exception as e:
+    except Exception:
         await send_error_log(traceback.format_exc())
 
 async def answer_callback_query(callback_query_id: str, text: str, show_alert: bool = False):
@@ -153,6 +164,7 @@ async def tg_polling_worker():
                             chat_id = msg["chat"]["id"]
                             text = msg["text"]
 
+                            # Возврат средств при отклонении заказа админом (Reply)
                             if "reply_to_message" in msg:
                                 reply_text = msg["reply_to_message"].get("text", msg["reply_to_message"].get("caption", ""))
                                 match = re.search(r'Заказ #(\d+)', reply_text)
@@ -208,20 +220,23 @@ async def tg_polling_worker():
                                     await edit_message_text(chat_id, msg_id, msg.get("text", msg.get("caption", "")) + f"\n\n<b>Статус:</b> {'Принят' if action == 'accept' else 'Отклонен'}", {"inline_keyboard": []})
                                 conn.close()
 
+                            # Выполнение заказа и просьба оставить отзыв
                             elif cb_data.startswith("order_done_"):
                                 tx_id = int(cb_data.split("_")[2])
                                 conn = get_db()
                                 cur = conn.cursor()
-                                cur.execute("SELECT status, user_id FROM transactions WHERE id = ?", (tx_id,))
+                                cur.execute("SELECT status, user_id, amount_rub FROM transactions WHERE id = ?", (tx_id,))
                                 tx = cur.fetchone()
                                 if tx and tx["status"] == "pending":
                                     cur.execute("UPDATE transactions SET status = 'completed' WHERE id = ?", (tx_id,))
                                     conn.commit()
                                     await answer_callback_query(cb_id, "Заказ выполнен!")
                                     
-                                    # Отправка плашки для отзыва
-                                    review_markup = {"inline_keyboard": [[{"text": "⭐️ Оставить отзыв", "web_app": {"url": f"{WEBAPP_URL}?startapp=review"}}]]}
-                                    await send_tg_message(tx["user_id"], f"✅ <b>Ваш заказ #{tx_id} успешно выполнен!</b>\n\nПожалуйста, уделите секунду и оставьте отзыв о нашей работе 👇", review_markup)
+                                    # Отправка юзеру плашки для отзыва с привязкой ID заказа (startapp=review_123)
+                                    review_markup = {"inline_keyboard": [[{"text": "⭐️ Оценить работу", "web_app": {"url": f"{WEBAPP_URL}?startapp=review_{tx_id}"}}]]}
+                                    user_msg = f"✅ <b>Ваш заказ #{tx_id} на сумму {tx['amount_rub']} ₽ успешно выполнен!</b>\n\nПожалуйста, уделите секунду и оставьте отзыв 👇"
+                                    
+                                    await send_tg_message(tx["user_id"], user_msg, review_markup)
                                     await edit_message_text(chat_id, msg_id, msg.get("text", msg.get("caption", "")) + "\n\n✅ <b>ВЫПОЛНЕН</b>", {"inline_keyboard": []})
                                 conn.close()
         except Exception:
@@ -286,7 +301,6 @@ async def api_auth(request: Request):
     conn.close()
     return dict(row)
 
-# Депозиты и Заказы (Без изменений, работают стабильно)
 @app.post("/api/deposit/crypto")
 async def create_crypto(request: Request):
     body = await request.json()
@@ -359,12 +373,12 @@ async def activate_promo(request: Request):
     conn.commit(); conn.close()
     return {"status": "ok", "amount": promo["amount"]}
 
-# --------- ОТЗЫВЫ ---------
+# --------- ОТЗЫВЫ (Обновлено с валидацией) ---------
 @app.get("/api/reviews")
 async def get_reviews(initData: str):
     validate_init_data(initData)
     conn = get_db()
-    rows = conn.execute("SELECT r.text, r.created_at, u.first_name FROM reviews r JOIN users u ON r.user_id = u.user_id ORDER BY r.id DESC LIMIT 50").fetchall()
+    rows = conn.execute("SELECT r.text, r.stars, r.amount_rub, r.created_at, u.first_name FROM reviews r JOIN users u ON r.user_id = u.user_id ORDER BY r.id DESC LIMIT 50").fetchall()
     conn.close()
     return {"reviews": [dict(r) for r in rows]}
 
@@ -373,9 +387,27 @@ async def add_review(request: Request):
     body = await request.json()
     uid = validate_init_data(body.get("initData", "")).get("id")
     text = body.get("text", "").strip()
-    if not text: raise HTTPException(status_code=400)
+    stars = int(body.get("stars", 5))
+    tx_id = int(body.get("tx_id", 0))
+    
+    if not text or not (1 <= stars <= 5) or not tx_id:
+        raise HTTPException(status_code=400, detail="Заполните все данные")
+        
     conn = get_db()
-    conn.execute("INSERT INTO reviews (user_id, text) VALUES (?, ?)", (uid, text))
+    # Проверка: есть ли у юзера этот выполненный заказ
+    tx = conn.execute("SELECT amount_rub, status, type FROM transactions WHERE id = ? AND user_id = ?", (tx_id, uid)).fetchone()
+    if not tx or tx["status"] != "completed" or tx["type"] not in ("service", "usdt"):
+        conn.close()
+        raise HTTPException(status_code=403, detail="Оставить отзыв можно только на успешно выполненный заказ.")
+        
+    # Проверка: не оставлял ли он уже отзыв на этот же заказ
+    existing = conn.execute("SELECT 1 FROM reviews WHERE tx_id = ?", (tx_id,)).fetchone()
+    if existing:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Вы уже оставили отзыв на этот заказ.")
+
+    conn.execute("INSERT INTO reviews (user_id, tx_id, stars, amount_rub, text) VALUES (?, ?, ?, ?, ?)", 
+                 (uid, tx_id, stars, tx["amount_rub"], text))
     conn.commit(); conn.close()
     return {"status": "ok"}
 
@@ -399,7 +431,7 @@ async def admin_get_stats(initData: str):
     
     conversion = round((users_with_deposits / total_users * 100) if total_users > 0 else 0, 1)
     profit_rub = round(turnover * 0.25, 2)
-    profit_kzt = round(profit_rub * 8, 2) # 25% с каждого рубля мы делаем 2 тенге
+    profit_kzt = round(profit_rub * 8, 2)
     
     return {"turnover": turnover, "conversion": conversion, "profit_rub": profit_rub, "profit_kzt": profit_kzt, "total_users": total_users}
 
