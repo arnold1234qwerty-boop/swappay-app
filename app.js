@@ -3,6 +3,8 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.expand();
     tg.ready();
+    // Фикс для правильного отображения на телефонах
+    document.body.style.height = `${tg.viewportStableHeight}px`;
 }
 
 let user = { id: 0, role: "user" };
@@ -10,10 +12,27 @@ let depMethod = 'crypto';
 let activeAdminChatUser = null;
 let chatInterval = null;
 
+// Система уведомлений внутри приложения
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.innerText = message;
+    toast.classList.add("show");
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+    setTimeout(() => { toast.classList.remove("show"); }, 3000);
+}
+
 async function initApp() {
     const t = localStorage.getItem("theme") || "basic";
     document.getElementById("theme-select").value = t;
-    document.body.setAttribute("data-theme", t);
+    
+    if (t === "custom") {
+        const bg = localStorage.getItem("custom_bg");
+        if (bg) document.body.style.backgroundImage = `url(${bg})`;
+    } else {
+        document.body.removeAttribute("style"); 
+        if (tg) document.body.style.height = `${tg.viewportStableHeight}px`;
+        document.body.setAttribute("data-theme", t);
+    }
     
     try {
         const r = await fetch("/api/auth", {
@@ -27,8 +46,6 @@ async function initApp() {
             document.getElementById("user-display").innerText = `@${user.username || user.first_name || "Пользователь"}`;
             document.getElementById("bal-rub").innerText = user.balance_rub.toFixed(2);
             document.getElementById("bal-bonus").innerText = `${user.bonus_balance.toFixed(2)} ₽`;
-            
-            // Настройка реферальной ссылки
             document.getElementById("ref-link").value = `https://t.me/SwapPay_Bot?start=ref_${user.user_id}`;
 
             if (user.role === "admin") {
@@ -43,8 +60,28 @@ async function initApp() {
 
 function changeTheme() {
     const t = document.getElementById("theme-select").value;
-    document.body.setAttribute("data-theme", t);
-    localStorage.setItem("theme", t);
+    if (t === "custom") {
+        document.getElementById("custom-bg-input").click();
+    } else {
+        document.body.style.backgroundImage = "";
+        document.body.setAttribute("data-theme", t);
+        localStorage.setItem("theme", t);
+        localStorage.removeItem("custom_bg");
+    }
+}
+
+function loadCustomBg(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const b64 = e.target.result;
+            localStorage.setItem("theme", "custom");
+            localStorage.setItem("custom_bg", b64);
+            document.body.setAttribute("data-theme", "basic"); // Сброс цветов подложки
+            document.body.style.backgroundImage = `url(${b64})`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
 }
 
 function switchTab(tab) {
@@ -72,19 +109,26 @@ function switchTab(tab) {
 function openModal(id, ptype = null) {
     document.getElementById(id).classList.add("active");
     
-    // Динамическая подстройка модалки покупки
     if (id === 'modal-purchase' && ptype) {
         document.getElementById('pur-type').value = ptype;
+        // Очищаем форму перед открытием
+        document.getElementById("pur-amt").value = "";
+        document.getElementById("pur-desc").value = "";
+        document.getElementById("pur-file").value = "";
+        document.getElementById("pur-file-label").innerText = "📸 Прикрепить фото (QR/Реквизиты)";
+        
         if (ptype === 'usdt') {
             document.getElementById('pur-title').innerText = "Покупка USDT (TRC-20)";
             document.getElementById('pur-desc').placeholder = "Ваш кошелек (начинается с T...)";
             document.getElementById('usdt-rate-box').classList.remove('hidden');
             document.getElementById('usdt-calc-hint').classList.remove('hidden');
+            document.getElementById('pur-photo-box').classList.add('hidden'); // USDT фото не нужно
         } else {
             document.getElementById('pur-title').innerText = "Оплата услуги / товара";
             document.getElementById('pur-desc').placeholder = "Ссылка или реквизиты услуги";
             document.getElementById('usdt-rate-box').classList.add('hidden');
             document.getElementById('usdt-calc-hint').classList.add('hidden');
+            document.getElementById('pur-photo-box').classList.remove('hidden'); // Показываем загрузку фото
         }
     }
 }
@@ -111,19 +155,15 @@ function setDep(el, method) {
 function calcDep() {
     const v = parseFloat(document.getElementById("dep-amt").value) || 0;
     const h = document.getElementById("dep-hint");
-    
-    h.innerText = depMethod === 'crypto' 
-        ? `К оплате: ${(v * 1.4).toFixed(2)} ₽` 
-        : depMethod === 'kaspi' 
-            ? `К оплате: ${(v * 8).toFixed(2)} ₸` 
-            : `К оплате: ${(v * 0.8).toFixed(2)} ₴`;
+    h.innerText = depMethod === 'crypto' ? `К оплате: ${(v * 1.4).toFixed(2)} ₽` 
+        : depMethod === 'kaspi' ? `К оплате: ${(v * 8).toFixed(2)} ₸` 
+        : `К оплате: ${(v * 0.8).toFixed(2)} ₴`;
 }
 
 function calcUsdt() {
     if (document.getElementById('pur-type').value !== 'usdt') return;
     const v = parseFloat(document.getElementById("pur-amt").value) || 0;
-    const usdt = (v / 95).toFixed(2);
-    document.getElementById("usdt-calc-hint").innerText = `Получите: ~${usdt} USDT`;
+    document.getElementById("usdt-calc-hint").innerText = `Получите: ~${(v / 95).toFixed(2)} USDT`;
 }
 
 async function depSubmit() {
@@ -134,6 +174,7 @@ async function depSubmit() {
     if (!amt || amt < 100) return alert("Минимум 100 ₽");
     
     btn.disabled = true;
+    const originalText = btn.innerText;
     btn.innerText = "Обработка...";
     
     try {
@@ -149,11 +190,8 @@ async function depSubmit() {
             
             const r = await fetch("/api/deposit/pdf-receipt", { method: "POST", body: fd });
             if (r.ok) {
-                alert("Чек успешно отправлен! Ожидайте подтверждения.");
+                showToast("Чек передан в обработку! Ожидайте начисления.");
                 closeModal('modal-deposit');
-                document.getElementById("dep-amt").value = "";
-                document.getElementById("dep-file").value = "";
-                document.getElementById("dep-file-label").innerText = "📄 Прикрепить чек (.PDF)";
             }
         } else {
             const r = await fetch("/api/deposit/crypto", {
@@ -168,11 +206,11 @@ async function depSubmit() {
             }
         }
     } catch (e) {
-        alert("Ошибка отправки. Попробуйте еще раз.");
+        alert("Ошибка. Проверьте правильность файла и суммы.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
     }
-    
-    btn.disabled = false;
-    btn.innerText = depMethod === 'crypto' ? "Перейти к оплате" : "Отправить чек";
 }
 
 async function submitPurchase() {
@@ -190,25 +228,35 @@ async function submitPurchase() {
     btn.innerText = "Отправка...";
     
     try {
-        const r = await fetch("/api/purchase", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ initData: tg?.initData || "", type: ptype, amount: amt, details: desc })
-        });
+        const fd = new FormData();
+        fd.append("initData", tg?.initData || "");
+        fd.append("ptype", ptype);
+        fd.append("amount", amt);
+        fd.append("details", desc);
+        
+        // Если прикрепили фото (QR)
+        if (ptype === 'service') {
+            const fileInput = document.getElementById("pur-file");
+            if (fileInput.files.length > 0) {
+                fd.append("photo", fileInput.files[0]);
+            }
+        }
+
+        const r = await fetch("/api/purchase", { method: "POST", body: fd });
         
         if (r.ok) {
-            alert("Заказ успешно создан и отправлен в обработку!");
+            showToast("Заказ успешно отправлен в работу!");
             closeModal('modal-purchase');
-            document.getElementById("pur-amt").value = "";
-            document.getElementById("pur-desc").value = "";
-            initApp();
+            await initApp(); // Мгновенное обновление баланса
         } else {
-            alert((await r.json()).detail || "Ошибка");
+            alert((await r.json()).detail || "Произошла ошибка");
         }
-    } catch (e) {}
-    
-    btn.disabled = false;
-    btn.innerText = "Создать заказ";
+    } catch (e) {
+        alert("Сбой соединения.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Создать заказ";
+    }
 }
 
 async function activatePromo() {
@@ -224,9 +272,9 @@ async function activatePromo() {
         
         const d = await r.json();
         if (r.ok) {
-            alert(`Промокод активирован! Вам начислено ${d.amount} ₽ бонусов.`);
+            showToast(`Промокод активирован: +${d.amount} ₽ !`);
             closeModal('modal-promo');
-            initApp();
+            await initApp();
         } else {
             alert(d.detail || "Ошибка активации");
         }
@@ -237,15 +285,9 @@ function copyRef() {
     const link = document.getElementById("ref-link");
     link.select();
     document.execCommand("copy");
-    alert("Реферальная ссылка скопирована!");
+    showToast("Реферальная ссылка скопирована!");
 }
 
-function logout() {
-    localStorage.clear();
-    if (tg) tg.close();
-}
-
-// --------- ПОДДЕРЖКА АДМИНКИ (НЕТРОНУТО) ---------
 async function loadUserChat() {
     try {
         const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}`);
@@ -254,8 +296,16 @@ async function loadUserChat() {
         const d = await r.json();
         const b = document.getElementById("user-chat-box");
         
-        document.getElementById("sup-status").innerText = d.status === 'closed' ? "Чат закрыт" : "Чат с поддержкой";
-        if (d.status === 'closed') document.getElementById("user-chat-input").disabled = true;
+        // Логика закрытого чата: прячем инпут, показываем кнопку возобновления
+        if (d.status === 'closed') {
+            document.getElementById("sup-status").innerText = "Диалог завершен";
+            document.getElementById("user-chat-input-wrap").classList.add("hidden");
+            document.getElementById("btn-reopen-chat").classList.remove("hidden");
+        } else {
+            document.getElementById("sup-status").innerText = "Чат с поддержкой";
+            document.getElementById("user-chat-input-wrap").classList.remove("hidden");
+            document.getElementById("btn-reopen-chat").classList.add("hidden");
+        }
         
         if (b.children.length === d.messages.length) return;
         
@@ -265,6 +315,13 @@ async function loadUserChat() {
         });
         b.scrollTop = b.scrollHeight;
     } catch (e) {}
+}
+
+function reopenChat() {
+    // Включаем инпут визуально, бекенд сам сменит статус при отправке нового сообщения
+    document.getElementById("user-chat-input-wrap").classList.remove("hidden");
+    document.getElementById("btn-reopen-chat").classList.add("hidden");
+    document.getElementById("sup-status").innerText = "Новый диалог";
 }
 
 async function sendMsgUser() {
