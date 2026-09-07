@@ -7,99 +7,237 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --bg-color: var(--tg-theme-bg-color, #17212b);
-            --text-color: var(--tg-theme-text-color, #ffffff);
-            --hint-color: var(--tg-theme-hint-color, #708499);
-            --btn-color: var(--tg-theme-button-color, #5288c1);
-            --btn-text-color: var(--tg-theme-button-text-color, #ffffff);
-            --secondary-bg: var(--tg-theme-secondary-bg-color, #232e3c);
+            --bg-color: #0e1621;
+            --card-bg: #17212b;
+            --btn-bg: #242f3d;
+            --btn-hover: #2b394a;
+            --primary: #5288c1;
+            --text-main: #ffffff;
+            --text-muted: #798b9c;
+            --accent-blue: #2f6ea5;
+            --border-color: rgba(255, 255, 255, 0.05);
         }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 16px;
+            color: var(--text-main);
+            padding: 14px;
+            font-size: 14px;
         }
-        .container { max-width: 600px; margin: 0 auto; }
+
+        .container { max-width: 480px; margin: 0 auto; }
+
+        /* Верхние вкладки */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        /* Карточка */
         .card {
-            background-color: var(--secondary-bg);
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
+            background: var(--card-bg);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            margin-bottom: 14px;
+            border: 1px solid var(--border-color);
         }
-        .balance-header { text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-        .bonus-balance { text-align: center; color: var(--hint-color); font-size: 14px; margin-bottom: 24px; }
-        .grid-buttons {
+
+        /* Баннер в шапке */
+        .banner {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(135deg, #1d3557, #457b9d);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 20px;
+            color: #fff;
+        }
+        .banner h1 { font-size: 22px; margin-bottom: 4px; font-weight: 700; }
+        .banner p { font-size: 12px; opacity: 0.85; line-height: 1.3; }
+
+        /* Контент карточки */
+        .card-body { padding: 16px; }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 13.5px;
+        }
+        .info-row span.label { color: var(--text-muted); }
+        .info-row span.val { font-weight: 600; }
+
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 14px 0;
+        }
+
+        /* Сетка кнопок в стиле меню бота */
+        .menu-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: 8px;
         }
-        button {
-            background-color: var(--btn-color);
-            color: var(--btn-text-color);
-            border: none;
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 14px;
-            font-weight: 600;
+        .full-width { grid-column: span 2; }
+
+        .bot-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 13px 10px;
+            color: #fff;
+            font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: background 0.15s;
         }
-        button:active { opacity: 0.8; }
-        .hidden { display: none; }
-        .nav-tabs { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; }
-        .nav-tab { flex: 1; padding: 10px; text-align: center; background: var(--secondary-bg); border-radius: 8px; cursor: pointer; }
-        .nav-tab.active { background: var(--btn-color); color: var(--btn-text-color); }
+        .bot-btn:active { background: var(--btn-hover); }
+
+        .hidden { display: none !important; }
+
         input {
-            width: 100%; box-sizing: border-box; padding: 12px; margin-top: 8px;
-            background: var(--bg-color); color: var(--text-color);
-            border: 1px solid var(--hint-color); border-radius: 8px;
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            margin-top: 8px;
+            outline: none;
         }
+        input:focus { border-color: var(--primary); }
     </style>
 </head>
 <body>
-    <div class="container" id="app">
-        <!-- Навигация (появляется только для Drop/Admin) -->
-        <div id="nav" class="nav-tabs hidden">
-            <div class="nav-tab active" onclick="switchTab('user')">Кабинет</div>
-            <div id="drop-tab" class="nav-tab hidden" onclick="switchTab('drop')">Заявки (Дроп)</div>
-            <div id="admin-tab" class="nav-tab hidden" onclick="switchTab('admin')">Админка</div>
-        </div>
 
-        <!-- Интерфейс пользователя -->
-        <div id="view-user">
-            <div class="card">
-                <div class="balance-header"><span id="balance">0</span> ₽</div>
-                <div class="bonus-balance">Бонусы: <span id="bonus-balance">0</span> ₽</div>
-                <div class="grid-buttons">
-                    <button onclick="openDeposit()">Пополнить</button>
-                    <button onclick="openBuy()">Купить / Оплатить</button>
-                    <button onclick="openCrypto()">Купить USDT</button>
-                    <button onclick="openReferrals()">Рефералы</button>
-                    <button onclick="openPromo()">Промокод</button>
-                    <button onclick="openSupport()">Поддержка</button>
+<div class="container">
+    <!-- Навигация между панелями (показывается дропам и админам) -->
+    <div class="tabs hidden" id="nav-tabs">
+        <div class="tab-btn active" onclick="showView('cabinet')">Кабинет</div>
+        <div class="tab-btn hidden" id="tab-drop" onclick="showView('drop')">Дроп</div>
+        <div class="tab-btn hidden" id="tab-admin" onclick="showView('admin')">Админ</div>
+    </div>
+
+    <!-- 1. Экран "Личный кабинет" (как на скринах) -->
+    <div id="view-cabinet" class="view">
+        <div class="card">
+            <div class="banner">
+                <h1 id="banner-title">Личный кабинет</h1>
+                <p id="banner-sub">Управление балансом и переводами</p>
+            </div>
+            <div class="card-body">
+                <div class="info-row">
+                    <span>👑</span>
+                    <span class="label">Статус:</span>
+                    <span class="val" id="user-role">USER</span>
                 </div>
-            </div>
-        </div>
+                <div class="info-row">
+                    <span>🪪</span>
+                    <span class="label">Telegram ID:</span>
+                    <span class="val" id="user-tg-id">000000000</span>
+                </div>
+                <div class="info-row">
+                    <span>💳</span>
+                    <span class="label">Баланс:</span>
+                    <span class="val" id="user-balance">0.00 ₽</span>
+                </div>
+                <div class="info-row">
+                    <span>🎁</span>
+                    <span class="label">Бонусный баланс:</span>
+                    <span class="val" id="user-bonus">0.00 ₽</span>
+                </div>
 
-        <!-- Интерфейс дропа -->
-        <div id="view-drop" class="hidden">
-            <div class="card">
-                <h3>Ожидающие транзакции</h3>
-                <div id="drop-tx-list">Загрузка...</div>
-            </div>
-        </div>
+                <div class="divider"></div>
 
-        <!-- Интерфейс админа -->
-        <div id="view-admin" class="hidden">
-            <div class="card">
-                <h3>Статистика</h3>
-                <div id="admin-stats">Загрузка...</div>
+                <div class="info-row">
+                    <span>📊</span>
+                    <span class="label">Статистика операций:</span>
+                </div>
+                <div style="padding-left: 24px; color: var(--text-muted); line-height: 1.6; font-size: 13px;">
+                    • Всего: <b style="color: #fff;" id="stat-total">0</b><br>
+                    • Успешных: <b style="color: #fff;" id="stat-success">0</b>
+                </div>
+
+                <div class="divider"></div>
+
+                <!-- Меню кнопок -->
+                <div class="menu-grid">
+                    <button class="bot-btn full-width" onclick="openDepositModal()">
+                        💳 Пополнить баланс
+                    </button>
+                    <button class="bot-btn" onclick="openBuyModal()">
+                        🏷 Купить / Оплатить
+                    </button>
+                    <button class="bot-btn" onclick="openProfileModal()">
+                        👤 Личный кабинет
+                    </button>
+                    <button class="bot-btn" onclick="openRefModal()">
+                        👥 Рефералы
+                    </button>
+                    <button class="bot-btn" onclick="openInfoModal()">
+                        ℹ️ Инфо / Курс
+                    </button>
+                    <button class="bot-btn full-width" onclick="openSupportModal()">
+                        💬 Поддержка
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- 2. Экран Дропа (Заявки) -->
+    <div id="view-drop" class="view hidden">
+        <div class="card">
+            <div class="banner" style="background: linear-gradient(135deg, #2b5876, #4e4376);">
+                <h1>Заявки оператора</h1>
+                <p>Подтверждение и обработка чеков</p>
+            </div>
+            <div class="card-body" id="drop-list">
+                Загрузка транзакций...
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Экран Админа -->
+    <div id="view-admin" class="view hidden">
+        <div class="card">
+            <div class="banner" style="background: linear-gradient(135deg, #1f4037, #99f2c8); color: #111;">
+                <h1 style="color: #0b2219;">Админ-центр</h1>
+                <p style="color: #0b2219;">Статистика и управление сервисом</p>
+            </div>
+            <div class="card-body" id="admin-stats">
+                Загрузка статистики...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
