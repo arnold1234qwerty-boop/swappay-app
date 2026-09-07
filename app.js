@@ -1,113 +1,135 @@
-const tg = window.Telegram.WebApp;
-tg.expand(); // Открываем на весь экран
+const tg = window.Telegram?.WebApp;
+if (tg) {
+    tg.expand();
+    tg.ready();
+}
 
-const API_URL = 'http://127.0.0.1:7174/api';
 let currentUser = null;
 
-async function initApp() {
-    if (!tg.initData) {
-        document.getElementById('app').innerHTML = '<div class="card">Пожалуйста, откройте приложение через Telegram.</div>';
-        return;
-    }
-
+// Авторизация пользователя при старте
+async function authUser() {
     try {
-        const response = await fetch(`${API_URL}/auth`, {
+        const response = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData: tg.initData })
+            body: JSON.stringify({
+                initData: tg?.initData || "" 
+            })
         });
 
-        if (!response.ok) throw new Error('Auth failed');
+        if (!response.ok) throw new Error("Auth failed");
         
         currentUser = await response.json();
-        updateUI();
-    } catch (error) {
-        tg.showAlert('Ошибка авторизации. Попробуйте перезапустить приложение.');
+        renderUserData();
+    } catch (e) {
+        console.warn("Тестовый запуск вне Telegram:", e);
+        // Фолбэк для тестов в обычном браузере
+        currentUser = {
+            user_id: 7531770025,
+            first_name: "User",
+            role: "admin",
+            drop: "all",
+            balance_rub: 350.00,
+            bonus_balance: 0.00
+        };
+        renderUserData();
     }
 }
 
-function updateUI() {
-    // Обновляем балансы
-    document.getElementById('balance').textContent = currentUser.balance_rub.toFixed(2);
-    document.getElementById('bonus-balance').textContent = currentUser.bonus_balance.toFixed(2);
+function renderUserData() {
+    document.getElementById('user-role').innerText = currentUser.role.toUpperCase();
+    document.getElementById('user-tg-id').innerText = currentUser.user_id;
+    document.getElementById('user-balance').innerText = `${currentUser.balance_rub.toFixed(2)} ₽`;
+    document.getElementById('user-bonus').innerText = `${currentUser.bonus_balance.toFixed(2)} ₽`;
 
-    // Логика отображения вкладок для особых ролей
-    const nav = document.getElementById('nav');
-    const dropTab = document.getElementById('drop-tab');
-    const adminTab = document.getElementById('admin-tab');
-    let showNav = false;
+    // Показываем кнопки дропа и админа, если есть права
+    const tabs = document.getElementById('nav-tabs');
+    const tabDrop = document.getElementById('tab-drop');
+    const tabAdmin = document.getElementById('tab-admin');
 
     if (currentUser.drop !== 'not' || currentUser.role === 'admin') {
-        dropTab.classList.remove('hidden');
-        showNav = true;
+        tabs.classList.remove('hidden');
+        tabDrop.classList.remove('hidden');
     }
-    
     if (currentUser.role === 'admin') {
-        adminTab.classList.remove('hidden');
-        showNav = true;
+        tabAdmin.classList.remove('hidden');
     }
-
-    if (showNav) nav.classList.remove('hidden');
 }
 
-function switchTab(tabId) {
-    document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-    event.target.classList.add('active');
+function showView(viewName) {
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
 
-    document.getElementById('view-user').classList.add('hidden');
-    document.getElementById('view-drop').classList.add('hidden');
-    document.getElementById('view-admin').classList.add('hidden');
+    document.getElementById(`view-${viewName}`).classList.remove('hidden');
+    event.currentTarget.classList.add('active');
 
-    document.getElementById(`view-${tabId}`).classList.remove('hidden');
-
-    if (tabId === 'drop') loadDropTransactions();
+    if (viewName === 'drop') loadDropOrders();
 }
 
-async function loadDropTransactions() {
+async function loadDropOrders() {
+    const list = document.getElementById('drop-list');
     try {
-        const res = await fetch(`${API_URL}/drop/transactions?initData=${encodeURIComponent(tg.initData)}`);
-        const txs = await res.json();
-        
-        const list = document.getElementById('drop-tx-list');
-        if (txs.length === 0) {
-            list.innerHTML = '<p style="color: var(--hint-color)">Нет заявок в ожидании.</p>';
+        const res = await fetch(`/api/drop/transactions?initData=${encodeURIComponent(tg?.initData || '')}`);
+        const data = await res.json();
+
+        if (!data.length) {
+            list.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Новых заявок пока нет</p>`;
             return;
         }
 
-        list.innerHTML = txs.map(tx => `
-            <div style="border-bottom: 1px solid var(--hint-color); padding-bottom: 8px; margin-bottom: 8px;">
-                <strong>ID:</strong> ${tx.id} | <strong>Сумма:</strong> ${tx.amount_rub} ₽ (${tx.amount_original} ${tx.currency})<br>
-                <button onclick="processTx(${tx.id}, 'completed')" style="margin-top:8px; width:48%">Принять</button>
-                <button onclick="processTx(${tx.id}, 'rejected')" style="margin-top:8px; width:48%; background-color:#e53935">Отклонить</button>
+        list.innerHTML = data.map(item => `
+            <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+                <div><b>Заявка #${item.id}</b> (${item.currency})</div>
+                <div style="color: var(--text-muted); font-size: 13px; margin: 4px 0;">Сумма: ${item.amount_rub} ₽ (${item.amount_original})</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="bot-btn" style="flex: 1; background: #2e7d32;" onclick="confirmOrder(${item.id})">Принять</button>
+                    <button class="bot-btn" style="flex: 1; background: #c62828;" onclick="rejectOrder(${item.id})">Отклонить</button>
+                </div>
             </div>
         `).join('');
-    } catch (e) {
-        tg.showAlert('Ошибка загрузки заявок');
+    } catch(err) {
+        list.innerText = "Ошибка загрузки списка заявок.";
     }
 }
 
-function openDeposit() {
-    tg.showPopup({
-        title: 'Пополнение баланса',
-        message: 'Выберите метод пополнения',
-        buttons: [
-            { id: 'kzt', type: 'default', text: 'Kaspi (KZT)' },
-            { id: 'uah', type: 'default', text: 'Monobank (UAH)' },
-            { id: 'crypto', type: 'default', text: 'CryptoBot' },
-            { type: 'cancel' }
-        ]
-    }, function(buttonId) {
-        if (buttonId) {
-            // Здесь логика перехода на форму ввода суммы
-            tg.showAlert(`Выбран метод: ${buttonId}. Интеграция формы в разработке.`);
-        }
-    });
+function openDepositModal() {
+    if (tg?.showPopup) {
+        tg.showPopup({
+            title: "Пополнение баланса",
+            message: "Выберите валюту / способ оплаты:",
+            buttons: [
+                { id: "kzt", type: "default", text: "🇰🇿 Kaspi (KZT)" },
+                { id: "uah", type: "default", text: "🇺🇦 Monobank (UAH)" },
+                { id: "crypto", type: "default", text: "💎 CryptoBot" },
+                { type: "cancel" }
+            ]
+        }, (btnId) => {
+            if (btnId) tg.showAlert(`Выбран способ: ${btnId}. Переход к реквизитам...`);
+        });
+    } else {
+        alert("Выберите способ оплаты (Kaspi / Monobank / Crypto)");
+    }
 }
 
-function openReferrals() {
-    const refLink = `t.me/SwapPayment_bot?start=ref_${currentUser.user_id}`;
-    tg.showAlert(`Ваша реферальная ссылка:\n${refLink}\n\nВы получаете 5% от суммы пополнения реферала.`);
+function openBuyModal() {
+    tg?.showAlert("Минимальная сумма покупки: 25 ₽. Введите реквизиты и сумму для оформления.");
 }
 
-tg.ready();
-initApp();
+function openProfileModal() {
+    tg?.showAlert(`Личный кабинет\nID: ${currentUser.user_id}\nБаланс: ${currentUser.balance_rub} ₽`);
+}
+
+function openRefModal() {
+    const link = `t.me/SwapPayment_bot?start=ref_${currentUser.user_id}`;
+    tg?.showAlert(`Ваша реферальная ссылка:\n${link}\n\nБонус: 5% от всех пополнений рефералов.`);
+}
+
+function openInfoModal() {
+    tg?.showAlert("Курсы обмена:\n1 ₽ = 8 KZT (тенге)\n1 ₽ = 0.8 UAH (гривна)\nMBank: временно не работает.");
+}
+
+function openSupportModal() {
+    tg?.openTelegramLink("https://t.me/твой_саппорт");
+}
+
+authUser();
