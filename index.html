@@ -13,28 +13,24 @@
             --bg-body: #0d121a;
             --bg-card: #151d28;
             --bg-card-inner: #1c2635;
-            --bg-btn: #202c3d;
             --bg-btn-hover: #2a3a50;
             --accent-blue: #3a86ff;
             --accent-green: #00e676;
-            --accent-red: #ff3366;
             --text-primary: #ffffff;
             --text-secondary: #8a99ad;
             --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-active: rgba(58, 134, 255, 0.4);
             --shadow-glow: 0 8px 32px rgba(0, 0, 0, 0.35);
         }
 
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg-body);
             color: var(--text-primary);
             padding: 12px 14px 90px 14px;
@@ -50,14 +46,10 @@
             gap: 14px;
         }
 
-        /* Баннер в стиле скринов */
         .hero-banner {
-            position: relative;
             background: linear-gradient(135deg, #1d3557 0%, #2a5298 60%, #1e3c72 100%);
             border-radius: 20px;
             padding: 20px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0, 114, 255, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.12);
         }
 
@@ -71,29 +63,17 @@
             font-size: 11px;
             font-weight: 700;
             margin-bottom: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .hero-badge .dot {
-            width: 6px;
-            height: 6px;
+            width: 6px; height: 6px;
             background: var(--accent-green);
             border-radius: 50%;
         }
 
-        .hero-title {
-            font-size: 20px;
-            font-weight: 800;
-            margin-bottom: 4px;
-        }
+        .hero-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+        .hero-sub { font-size: 12px; color: rgba(255, 255, 255, 0.8); }
 
-        .hero-sub {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.8);
-            line-height: 1.35;
-        }
-
-        /* Главная карточка с балансом */
         .wallet-card {
             background: var(--bg-card);
             border-radius: 20px;
@@ -128,66 +108,22 @@
         .balance-main {
             font-size: 34px;
             font-weight: 800;
-            letter-spacing: -0.5px;
             display: flex;
             align-items: baseline;
             gap: 6px;
         }
 
-        .currency-symbol {
-            color: var(--accent-blue);
-            font-size: 26px;
-        }
+        .currency-symbol { color: var(--accent-blue); font-size: 26px; }
 
         .balance-bonus {
             display: flex;
-            align-items: center;
             gap: 6px;
             font-size: 13px;
             color: var(--text-secondary);
             margin-top: 6px;
         }
 
-        .balance-bonus strong {
-            color: var(--accent-green);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 16px;
-            padding-top: 14px;
-            border-top: 1px solid var(--border-subtle);
-        }
-
-        .stat-item {
-            background: var(--bg-card-inner);
-            padding: 10px 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border-subtle);
-        }
-
-        .stat-label {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 2px;
-        }
-
-        .stat-val {
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        /* Кнопки меню */
-        .section-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-left: 2px;
-        }
+        .balance-bonus strong { color: var(--accent-green); }
 
         .action-grid {
             display: grid;
@@ -207,13 +143,9 @@
             font-size: 13.5px;
             font-weight: 600;
             cursor: pointer;
-            transition: 0.15s;
         }
 
-        .btn-action:active {
-            transform: scale(0.98);
-            background: var(--bg-btn-hover);
-        }
+        .btn-action:active { background: var(--bg-btn-hover); transform: scale(0.98); }
 
         .btn-action.primary {
             grid-column: span 2;
@@ -225,24 +157,7 @@
             padding: 15px;
         }
 
-        /* Карточка курсов */
-        .rates-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            padding: 14px 16px;
-        }
-
-        .rate-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12.5px;
-            padding: 6px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .rate-row:last-child { border-bottom: none; }
-
-        /* Модальные окна (Шторки) */
+        /* Модальные окна */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -254,13 +169,10 @@
             z-index: 1000;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.25s ease;
+            transition: opacity 0.2s ease;
         }
 
-        .modal-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
 
         .modal-sheet {
             width: 100%;
@@ -268,17 +180,14 @@
             background: #17212b;
             border-radius: 24px 24px 0 0;
             border: 1px solid var(--border-subtle);
-            border-bottom: none;
             padding: 20px;
             max-height: 85vh;
             overflow-y: auto;
             transform: translateY(100%);
-            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .modal-overlay.active .modal-sheet {
-            transform: translateY(0);
-        }
+        .modal-overlay.active .modal-sheet { transform: translateY(0); }
 
         .modal-header {
             display: flex;
@@ -287,14 +196,8 @@
             margin-bottom: 16px;
         }
 
-        .modal-header h3 {
-            font-size: 17px;
-            font-weight: 700;
-        }
-
         .modal-close {
-            width: 28px;
-            height: 28px;
+            width: 28px; height: 28px;
             background: var(--bg-card-inner);
             border-radius: 50%;
             display: flex;
@@ -302,27 +205,18 @@
             justify-content: center;
             cursor: pointer;
             color: var(--text-secondary);
-            font-size: 14px;
         }
 
-        /* Выбор способов пополнения */
-        .methods-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
+        .methods-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 
         .method-pill {
             display: flex;
-            align-items: center;
             justify-content: space-between;
             padding: 12px;
             background: var(--bg-card-inner);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
             cursor: pointer;
-            transition: 0.15s;
         }
 
         .method-pill.active {
@@ -330,17 +224,8 @@
             background: rgba(58, 134, 255, 0.1);
         }
 
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .input-group label {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
+        .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .input-group label { font-size: 12px; color: var(--text-secondary); }
 
         .input-styled {
             width: 100%;
@@ -352,7 +237,6 @@
             font-size: 14px;
             outline: none;
         }
-        .input-styled:focus { border-color: var(--accent-blue); }
 
         .btn-submit {
             width: 100%;
@@ -362,16 +246,14 @@
             border: none;
             border-radius: 12px;
             font-weight: 700;
-            font-size: 14px;
             cursor: pointer;
-            margin-top: 6px;
         }
 
-        /* Нижний тулбар переключения для админа */
+        /* Навигация админа */
         .bottom-nav {
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            background: rgba(21, 29, 40, 0.9);
+            background: rgba(21, 29, 40, 0.95);
             backdrop-filter: blur(12px);
             border-top: 1px solid var(--border-subtle);
             display: flex;
@@ -394,37 +276,21 @@
         }
 
         .nav-btn.active { color: var(--accent-blue); }
-
-        /* Админ-панель */
-        .admin-stat-card {
-            background: var(--bg-card-inner);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 14px;
-            margin-bottom: 10px;
-        }
-
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- 1. ПОЛЬЗОВАТЕЛЬСКИЙ ЭКРАН -->
     <div id="view-user" class="view">
-        <!-- Шапка-Баннер -->
         <div class="hero-banner">
-            <div class="hero-badge">
-                <div class="dot"></div>
-                SwapPay Official
-            </div>
+            <div class="hero-badge"><div class="dot"></div>SwapPay Official</div>
             <div class="hero-title">Быстрый обмен</div>
-            <div class="hero-sub">Пополнение Kaspi, Monobank и CryptoBot по выгодному курсу</div>
+            <div class="hero-sub">Kaspi Bank, Monobank и CryptoBot онлайн</div>
         </div>
 
         <div style="height: 14px;"></div>
 
-        <!-- Баланс -->
         <div class="wallet-card">
             <div class="wallet-header">
                 <div class="wallet-header-title">Виртуальный счет</div>
@@ -440,89 +306,50 @@
                 <span>Бонусный баланс:</span>
                 <strong id="bonus-balance">0.00 ₽</strong>
             </div>
-
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-label">Всего операций</div>
-                    <div class="stat-val" id="stat-total">0</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Успешных</div>
-                    <div class="stat-val" style="color: var(--accent-green);" id="stat-success">0</div>
-                </div>
-            </div>
         </div>
 
         <div style="height: 14px;"></div>
 
-        <!-- Кнопки действий -->
-        <div class="section-label" style="margin-bottom: 8px;">Операции</div>
         <div class="action-grid">
             <button class="btn-action primary" onclick="openDepositModal()">
                 <span>💳</span> Пополнить баланс
             </button>
-            <button class="btn-action" onclick="openBuyModal()">
+            <button class="btn-action" onclick="alert('Раздел покупки открывается')">
                 <span>🛍</span> Купить / Оплатить
             </button>
-            <button class="btn-action" onclick="openRefModal()">
+            <button class="btn-action" onclick="alert('Рефералы')">
                 <span>👥</span> Рефералы
             </button>
-            <button class="btn-action" onclick="openPromoModal()">
+            <button class="btn-action" onclick="alert('Промокоды')">
                 <span>🎁</span> Промокод
             </button>
-            <button class="btn-action" onclick="openSupport()">
-                <span>💬</span> Поддержка
+            <button class="btn-action" style="grid-column: span 2;" onclick="alert('Чат поддержки')">
+                <span>💬</span> Поддержка сервиса
             </button>
-        </div>
-
-        <div style="height: 14px;"></div>
-
-        <!-- Курсы -->
-        <div class="rates-card">
-            <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">🔄 Актуальные курсы</div>
-            <div class="rate-row">
-                <span style="color: var(--text-secondary);">🇰🇿 Kaspi Bank</span>
-                <strong>1 ₽ = 8.00 ₸</strong>
-            </div>
-            <div class="rate-row">
-                <span style="color: var(--text-secondary);">🇺🇦 Monobank</span>
-                <strong>1 ₽ = 0.80 ₴</strong>
-            </div>
-            <div class="rate-row">
-                <span style="color: var(--text-secondary);">💎 CryptoBot</span>
-                <strong>USDT / TON / BTC</strong>
-            </div>
         </div>
     </div>
 
-    <!-- 2. ЭКРАН АДМИН-ПАНЕЛИ (для 7531770025) -->
+    <!-- Панель Администратора -->
     <div id="view-admin" class="view hidden">
         <div class="hero-banner" style="background: linear-gradient(135deg, #1f4037 0%, #004d40 100%);">
-            <div class="hero-badge">ADMIN CONTROL</div>
-            <div class="hero-title">Панель администратора</div>
-            <div class="hero-sub">Управление системой, пользователями и промокодами</div>
+            <div class="hero-badge">SUPER ADMIN</div>
+            <div class="hero-title">Панель управления</div>
+            <div class="hero-sub">ID: 7531770025 | Все права активны</div>
         </div>
 
         <div style="height: 14px;"></div>
 
-        <div class="admin-stat-card">
-            <div class="stat-label">Оборот сервиса</div>
-            <div style="font-size: 22px; font-weight: 800; color: #00e676;">0.00 ₽</div>
-            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Каспи: 0 ₸ | Моно: 0 ₴</div>
-        </div>
-
-        <div class="action-grid">
-            <button class="btn-action" onclick="alert('Список пользователей в разработке')">
-                <span>👥</span> Юзеры (1)
-            </button>
-            <button class="btn-action" onclick="alert('Создание промокода')">
-                <span>🏷</span> Создать промо
-            </button>
+        <div class="wallet-card">
+            <div class="wallet-header-title" style="margin-bottom: 6px;">Управление системой</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">
+                • Автоматический мониторинг CryptoBot запущен<br>
+                • Логирование в чат <code>-5401409248</code> активно
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Модальное окно: Пополнение -->
+<!-- Модальное окно пополнения -->
 <div class="modal-overlay" id="modal-deposit">
     <div class="modal-sheet">
         <div class="modal-header">
@@ -530,7 +357,7 @@
             <div class="modal-close" onclick="closeModals()">✕</div>
         </div>
         <div class="methods-list">
-            <div class="method-pill active" onclick="selectMethod(this, 'kaspi')">
+            <div class="method-pill" onclick="selectMethod(this, 'kaspi')">
                 <div>🇰🇿 <b>Kaspi Bank</b></div>
                 <div style="font-size: 12px; color: var(--text-secondary);">1 ₽ = 8.00 ₸</div>
             </div>
@@ -538,78 +365,23 @@
                 <div>🇺🇦 <b>Monobank</b></div>
                 <div style="font-size: 12px; color: var(--text-secondary);">1 ₽ = 0.80 ₴</div>
             </div>
-            <div class="method-pill" onclick="selectMethod(this, 'crypto')">
+            <div class="method-pill active" onclick="selectMethod(this, 'crypto')">
                 <div>💎 <b>CryptoBot</b></div>
-                <div style="font-size: 12px; color: var(--text-secondary);">Авто-выставление</div>
+                <div style="font-size: 12px; color: var(--accent-green);">+40% комиссия (Авто)</div>
             </div>
         </div>
 
         <div class="input-group">
-            <label>Сумма в рублях (₽):</label>
+            <label>Сумма начисления в рублях (₽):</label>
             <input type="number" id="deposit-amount" class="input-styled" placeholder="Минимум 100 ₽" oninput="calcExchange()">
-            <div style="font-size: 12px; color: var(--accent-blue); margin-top: 4px;" id="deposit-calc">К оплате: 0.00 ₸</div>
+            <div style="font-size: 12px; color: var(--accent-blue); margin-top: 4px;" id="deposit-calc">Сумма к оплате: 0.00 ₽ (с наценкой 40%)</div>
         </div>
 
-        <button class="btn-submit" onclick="submitDeposit()">Получить реквизиты</button>
+        <button class="btn-submit" id="btn-deposit-submit" onclick="submitDeposit()">Перейти к оплате</button>
     </div>
 </div>
 
-<!-- Модальное окно: Купить/Оплатить -->
-<div class="modal-overlay" id="modal-buy">
-    <div class="modal-sheet">
-        <div class="modal-header">
-            <h3>Купить / Оплатить</h3>
-            <div class="modal-close" onclick="closeModals()">✕</div>
-        </div>
-        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
-            Доступно на балансе: <b style="color: #fff;" id="modal-buy-bal">0.00 ₽</b>
-        </div>
-        <div class="input-group">
-            <label>Сумма оплаты (₽):</label>
-            <input type="number" class="input-styled" placeholder="Минимум 25 ₽">
-        </div>
-        <div class="input-group">
-            <label>Реквизиты / Ссылка на товар:</label>
-            <input type="text" class="input-styled" placeholder="Куда и за что оплачивать">
-        </div>
-        <button class="btn-submit" onclick="alert('Заявка на оплату сформирована!')">Создать заказ</button>
-    </div>
-</div>
-
-<!-- Модальное окно: Рефералы -->
-<div class="modal-overlay" id="modal-ref">
-    <div class="modal-sheet">
-        <div class="modal-header">
-            <h3>Партнерская программа</h3>
-            <div class="modal-close" onclick="closeModals()">✕</div>
-        </div>
-        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 14px;">
-            Получайте <b>5%</b> от каждого успешного пополнения баланса приглашенных пользователей.
-        </div>
-        <div class="input-group">
-            <label>Ваша персональная ссылка:</label>
-            <input type="text" id="ref-link-input" class="input-styled" readonly>
-        </div>
-        <button class="btn-submit" onclick="copyRefLink()">Скопировать ссылку</button>
-    </div>
-</div>
-
-<!-- Модальное окно: Промокод -->
-<div class="modal-overlay" id="modal-promo">
-    <div class="modal-sheet">
-        <div class="modal-header">
-            <h3>Активация промокода</h3>
-            <div class="modal-close" onclick="closeModals()">✕</div>
-        </div>
-        <div class="input-group">
-            <label>Введите код:</label>
-            <input type="text" class="input-styled" placeholder="SWAP-2026" style="text-transform: uppercase;">
-        </div>
-        <button class="btn-submit" onclick="alert('Промокод успешно активирован!')">Применить</button>
-    </div>
-</div>
-
-<!-- Нижняя навигация для Админа -->
+<!-- Навигация для Админа -->
 <div class="bottom-nav hidden" id="admin-bottom-bar">
     <button class="nav-btn active" id="btn-tab-user" onclick="switchTab('user')">
         <span>👤</span> Кабинет
