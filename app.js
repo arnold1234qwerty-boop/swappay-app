@@ -3,7 +3,6 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.expand();
     tg.ready();
-    
     // Динамическая калибровка экрана для предотвращения скачков
     const setHeight = () => document.documentElement.style.setProperty('--tg-viewport-stable-height', `${tg.viewportStableHeight || window.innerHeight}px`);
     tg.onEvent('viewportChanged', setHeight);
@@ -14,6 +13,10 @@ let user = { id: 0, role: "user" };
 let depMethod = 'crypto';
 let activeAdminChatUser = null;
 let chatInterval = null;
+
+// Переменные для отзывов
+let currentReviewTxId = null;
+let currentReviewStars = 5;
 
 function showToast(message) {
     const toast = document.getElementById("toast");
@@ -47,12 +50,14 @@ async function initApp() {
             document.getElementById("user-display").innerText = `@${user.username || user.first_name || "Пользователь"}`;
             document.getElementById("bal-rub").innerText = user.balance_rub.toFixed(2);
             document.getElementById("bal-bonus").innerText = `${user.bonus_balance.toFixed(2)} ₽`;
-            document.getElementById("ref-link").value = `https://t.me/SwapPay_Bot?start=ref_${user.user_id}`;
+            document.getElementById("ref-link").value = `https://t.me/SwapPayBot?start=ref_${user.user_id}`; // Укажи тут юзернейм своего бота
 
             if (user.role === "admin") document.getElementById("nav-admin").classList.remove("hidden");
             
-            // Если перешли с инлайн-кнопки для отзыва
-            if (tg?.initDataUnsafe?.start_param === 'review') {
+            // Логика перехода из бота напрямую к оставлению отзыва
+            const startParam = tg?.initDataUnsafe?.start_param;
+            if (startParam && startParam.startsWith('review_')) {
+                currentReviewTxId = parseInt(startParam.split('_')[1]);
                 openModal('modal-review-add');
             }
         }
@@ -88,11 +93,17 @@ function loadCustomBg(input) {
 function switchTab(tab) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-    setTimeout(() => { document.getElementById(`view-${tab}`).classList.add("active"); document.getElementById(`nav-${tab}`).classList.add("active"); }, 50);
+    setTimeout(() => { 
+        document.getElementById(`view-${tab}`).classList.add("active"); 
+        document.getElementById(`nav-${tab}`).classList.add("active"); 
+    }, 50);
+    
     clearInterval(chatInterval);
     
     if (tab === "support") {
-        loadUserChat(); chatInterval = setInterval(loadUserChat, 3000);
+        document.getElementById("user-chat-box").innerHTML = ""; // Очищаем при входе на вкладку
+        loadUserChat(); 
+        chatInterval = setInterval(loadUserChat, 3000);
     } else if (tab === "admin") {
         loadAdminData();
     } else if (tab === "reviews") {
@@ -124,6 +135,7 @@ function openModal(id, ptype = null) {
         }
     }
 }
+
 function closeModal(id) { document.getElementById(id).classList.remove("active"); }
 
 function setDep(el, method) {
@@ -137,6 +149,7 @@ function calcDep() {
     const v = parseFloat(document.getElementById("dep-amt").value) || 0;
     document.getElementById("dep-hint").innerText = depMethod === 'crypto' ? `К оплате: ${(v * 1.4).toFixed(2)} ₽` : depMethod === 'kaspi' ? `К оплате: ${(v * 8).toFixed(2)} ₸` : `К оплате: ${(v * 0.8).toFixed(2)} ₴`;
 }
+
 function calcUsdt() {
     if (document.getElementById('pur-type').value !== 'usdt') return;
     document.getElementById("usdt-calc-hint").innerText = `Получите: ~${((parseFloat(document.getElementById("pur-amt").value) || 0) / 95).toFixed(2)} USDT`;
@@ -199,52 +212,112 @@ async function loadReviews() {
         const b = document.getElementById("reviews-list");
         b.innerHTML = "";
         d.reviews.forEach(rv => {
+            let starsHtml = '⭐️'.repeat(rv.stars);
             b.innerHTML += `
             <div class="pill" style="flex-direction: column; align-items: flex-start; gap: 5px;">
-                <div style="font-size: 11px; color: var(--accent-main); font-weight: 800;">@${rv.first_name || "Пользователь"} <span style="color:var(--text-secondary); float:right; font-weight:400;">${rv.created_at.split(' ')[0]}</span></div>
-                <div style="font-size: 13px;">${rv.text}</div>
+                <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 11px; color: var(--accent-main); font-weight: 800;">@${rv.first_name || "Пользователь"}</div>
+                    <div style="font-size: 10px; color:var(--text-secondary);">${rv.created_at.split(' ')[0]}</div>
+                </div>
+                <div style="font-size: 10px; color: #10b981;">Заказ на ${rv.amount_rub} ₽ &nbsp;|&nbsp; ${starsHtml}</div>
+                <div style="font-size: 13px; margin-top: 4px;">${rv.text}</div>
             </div>`;
         });
+        if (d.reviews.length === 0) b.innerHTML = "<div style='font-size:12px; color:var(--text-secondary); text-align:center;'>Отзывов пока нет</div>";
     } catch(e){}
 }
 
+function setReviewStars(num) {
+    currentReviewStars = num;
+    for(let i=1; i<=5; i++) {
+        const starEl = document.getElementById(`star-${i}`);
+        if(i <= num) {
+            starEl.style.opacity = "1";
+            starEl.style.transform = "scale(1.2)";
+        } else {
+            starEl.style.opacity = "0.3";
+            starEl.style.transform = "scale(1)";
+        }
+    }
+}
+
 async function submitReview() {
+    if(!currentReviewTxId) return showToast("Отзыв можно оставить только перейдя по кнопке из уведомления об успешном заказе!");
     const txt = document.getElementById("review-text").value;
-    if(!txt) return showToast("Напишите отзыв!");
+    if(!txt) return showToast("Напишите текст отзыва!");
+    
     try {
-        await fetch("/api/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", text: txt }) });
-        showToast("Спасибо за ваш отзыв!");
-        closeModal("modal-review-add");
-        document.getElementById("review-text").value = "";
-        if (document.getElementById("view-reviews").classList.contains("active")) loadReviews();
-    } catch(e){}
+        const r = await fetch("/api/reviews", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ 
+                initData: tg?.initData || "", 
+                text: txt, 
+                stars: currentReviewStars, 
+                tx_id: currentReviewTxId 
+            }) 
+        });
+        const d = await r.json();
+        
+        if (r.ok) {
+            showToast("Спасибо за ваш отзыв!");
+            closeModal("modal-review-add");
+            document.getElementById("review-text").value = "";
+            currentReviewTxId = null;
+            if (document.getElementById("view-reviews").classList.contains("active")) loadReviews();
+        } else {
+            showToast(d.detail || "Ошибка");
+        }
+    } catch(e){ showToast("Ошибка соединения"); }
 }
 
 // --------- ПОДДЕРЖКА ---------
 async function loadUserChat() {
     try {
         const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}`);
-        const d = await r.json(); const b = document.getElementById("user-chat-box");
+        const d = await r.json(); 
+        const b = document.getElementById("user-chat-box");
+        
         if (d.status === 'closed') {
-            document.getElementById("sup-status").innerText = "Диалог завершен"; document.getElementById("user-chat-input-wrap").classList.add("hidden"); document.getElementById("btn-reopen-chat").classList.remove("hidden");
+            document.getElementById("sup-status").innerText = "Диалог завершен"; 
+            document.getElementById("user-chat-input-wrap").classList.add("hidden"); 
+            document.getElementById("btn-reopen-chat").classList.remove("hidden");
         } else {
-            document.getElementById("sup-status").innerText = "Чат с поддержкой"; document.getElementById("user-chat-input-wrap").classList.remove("hidden"); document.getElementById("btn-reopen-chat").classList.add("hidden");
+            document.getElementById("sup-status").innerText = "Чат с поддержкой"; 
+            document.getElementById("user-chat-input-wrap").classList.remove("hidden"); 
+            document.getElementById("btn-reopen-chat").classList.add("hidden");
         }
-        if (b.children.length === d.messages.length) return;
-        b.innerHTML = ""; d.messages.forEach(m => { b.innerHTML += `<div class="msg ${m.sender === 'user' ? 'right' : 'left'}"><div>${m.text}</div></div>`; });
-        b.scrollTop = b.scrollHeight;
+        
+        // Append-Only логика (добавляем только новые сообщения, чтобы не сбивать фокус ввода)
+        const currentCount = b.children.length;
+        if (d.messages.length > currentCount) {
+            for(let i = currentCount; i < d.messages.length; i++) {
+                let m = d.messages[i];
+                let div = document.createElement('div');
+                div.className = `msg ${m.sender === 'user' ? 'right' : 'left'}`;
+                div.innerHTML = `<div>${m.text}</div>`;
+                b.appendChild(div);
+            }
+            b.scrollTop = b.scrollHeight;
+        }
     } catch (e) {}
 }
-function reopenChat() { document.getElementById("user-chat-input-wrap").classList.remove("hidden"); document.getElementById("btn-reopen-chat").classList.add("hidden"); document.getElementById("sup-status").innerText = "Новый диалог"; }
+
+function reopenChat() { 
+    document.getElementById("user-chat-input-wrap").classList.remove("hidden"); 
+    document.getElementById("btn-reopen-chat").classList.add("hidden"); 
+    document.getElementById("sup-status").innerText = "Новый диалог"; 
+}
+
 async function sendMsgUser() {
     const i = document.getElementById("user-chat-input"), v = i.value.trim(); if (!v) return; i.value = "";
-    await fetch("/api/support/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", text: v }) }); loadUserChat();
+    await fetch("/api/support/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", text: v }) }); 
+    loadUserChat();
 }
 
 // --------- АДМИНКА ---------
 async function loadAdminData() {
     try {
-        // Загрузка статистики
         const rs = await fetch(`/api/admin/stats?initData=${encodeURIComponent(tg?.initData || "")}`);
         if(rs.ok) {
             const st = await rs.json();
@@ -253,7 +326,6 @@ async function loadAdminData() {
             document.getElementById("stat-profit-rub").innerText = st.profit_rub.toLocaleString();
             document.getElementById("stat-profit-kzt").innerText = st.profit_kzt.toLocaleString();
         }
-        // Загрузка тикетов
         const rt = await fetch(`/api/admin/tickets?initData=${encodeURIComponent(tg?.initData || "")}`);
         if(rt.ok) {
             const tk = await rt.json();
@@ -289,11 +361,25 @@ async function openAdminChat(uid, name) {
     activeAdminChatUser = uid; document.getElementById("view-admin").classList.remove("active");
     setTimeout(() => document.getElementById("view-admin-chat").classList.add("active"), 50);
     clearInterval(chatInterval);
+    document.getElementById("admin-chat-box").innerHTML = ""; // Очищаем старый чат перед открытием нового
+    
     const fetchChat = async () => {
         const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}&target_uid=${uid}`);
-        const d = await r.json(); const b = document.getElementById("admin-chat-box");
-        if (b.children.length === d.messages.length) return; b.innerHTML = "";
-        d.messages.forEach(m => { b.innerHTML += `<div class="msg ${m.sender === 'user' ? 'left' : 'right'}"><div>${m.text}</div></div>`; }); b.scrollTop = b.scrollHeight;
+        const d = await r.json(); 
+        const b = document.getElementById("admin-chat-box");
+        
+        // Append-Only логика для админа
+        const currentCount = b.children.length;
+        if (d.messages.length > currentCount) {
+            for(let i = currentCount; i < d.messages.length; i++) {
+                let m = d.messages[i];
+                let div = document.createElement('div');
+                div.className = `msg ${m.sender === 'user' ? 'left' : 'right'}`;
+                div.innerHTML = `<div>${m.text}</div>`;
+                b.appendChild(div);
+            }
+            b.scrollTop = b.scrollHeight;
+        }
     };
     fetchChat(); chatInterval = setInterval(fetchChat, 3000);
 }
