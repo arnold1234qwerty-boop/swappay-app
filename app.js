@@ -25,7 +25,7 @@ particleStyle.innerHTML = `
     .particle {
         position: fixed;
         top: -50px;
-        z-index: 0; /* Под карточками, чтобы не мешать тексту */
+        z-index: 0;
         pointer-events: none;
         animation: fall linear forwards;
         opacity: 0.6;
@@ -45,9 +45,10 @@ document.addEventListener('touchstart', (e) => {
 
 function showToast(message) {
     const toast = document.getElementById("toast");
+    if (!toast) return;
     toast.innerText = message;
     toast.classList.add("show");
-    if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
     setTimeout(() => { toast.classList.remove("show"); }, 3000);
 }
 
@@ -55,10 +56,11 @@ async function initApp() {
     const t = localStorage.getItem("theme") || "basic";
     const p = localStorage.getItem("particles") || "none";
     
-    document.getElementById("theme-select").value = t;
-    // Ожидаем, что в index.html появится селект для партиклов с id="particles-select"
+    const themeSelect = document.getElementById("theme-select");
+    if (themeSelect) themeSelect.value = t;
+
     const pSelect = document.getElementById("particles-select");
-    if(pSelect) pSelect.value = p;
+    if (pSelect) pSelect.value = p;
     
     if (t === "custom") {
         const bg = localStorage.getItem("custom_bg");
@@ -72,7 +74,7 @@ async function initApp() {
         document.body.setAttribute("data-theme", t);
     }
     
-    setParticles(p); // Запуск партиклов
+    setParticles(p);
     
     try {
         const r = await fetch("/api/auth", {
@@ -83,24 +85,35 @@ async function initApp() {
         
         if (r.ok) {
             user = await r.json();
-            document.getElementById("user-display").innerText = `@${user.username || user.first_name || "Пользователь"}`;
-            document.getElementById("bal-rub").innerText = user.balance_rub.toFixed(2);
-            document.getElementById("bal-bonus").innerText = `${user.bonus_balance.toFixed(2)} ₽`;
-            document.getElementById("ref-link").value = `https://t.me/swapaapaaAPP_bot?start=ref_${user.user_id}`;
-
-            if (user.role === "admin") document.getElementById("nav-admin").classList.remove("hidden");
+            const uDisp = document.getElementById("user-display");
+            if (uDisp) uDisp.innerText = `@${user.username || user.first_name || "Пользователь"}`;
             
-            // Проверяем Telegram start_param ИЛИ обычные GET-параметры URL (?startapp=...)
-const urlParams = new URLSearchParams(window.location.search);
-const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('startapp');
+            const balRub = document.getElementById("bal-rub");
+            if (balRub) balRub.innerText = (user.balance_rub || 0).toFixed(2);
+            
+            const balBonus = document.getElementById("bal-bonus");
+            if (balBonus) balBonus.innerText = `${(user.bonus_balance || 0).toFixed(2)} ₽`;
+            
+            const refLink = document.getElementById("ref-link");
+            if (refLink) refLink.value = `https://t.me/swapaapaaAPP_bot?start=ref_${user.user_id}`;
 
-if (startParam && startParam.startsWith('review_')) {
-    currentReviewTxId = parseInt(startParam.split('_')[1]);
-    openModal('modal-review-add');
-}
+            if (user.role === "admin") {
+                const navAdm = document.getElementById("nav-admin");
+                if (navAdm) navAdm.classList.remove("hidden");
+            }
+            
+            // Двойная проверка параметра отзыва: из Telegram WebApp API или из URL-адреса браузера
+            const urlParams = new URLSearchParams(window.location.search);
+            const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('startapp');
+
+            if (startParam && startParam.startsWith('review_')) {
+                currentReviewTxId = parseInt(startParam.split('_')[1]);
+                openModal('modal-review-add');
             }
         }
-    } catch (e) { showToast("Ошибка связи с сервером"); }
+    } catch (e) { 
+        showToast("Ошибка связи с сервером"); 
+    }
 }
 
 function changeTheme() {
@@ -131,7 +144,7 @@ function loadCustomBg(input) {
     }
 }
 
-// --- ДВИЖОК ПАРТИКЛОВ (ОПТИМИЗИРОВАННЫЙ) ---
+// --- ДВИЖОК ПАРТИКЛОВ ---
 function changeParticles() {
     const type = document.getElementById("particles-select").value;
     setParticles(type);
@@ -148,21 +161,21 @@ function setParticles(type) {
         'snow': ['❄️', '🌨'],
         'leaves': ['🍂', '🍃', '🍁'],
         'money': ['💵', '💸', '💰'],
-        'water': ['🛢️', '💧', '🧊'] // 5-литровые бутылки воды и капли
+        'water': ['🛢️', '💧', '🧊']
     }[type];
 
-    if(!emojis) return;
+    if (!emojis) return;
 
-    const maxParticles = 25; // Ограничение для оптимизации
+    const maxParticles = 25;
     particleInterval = setInterval(() => {
-        if(document.querySelectorAll('.particle').length > maxParticles) return;
+        if (document.querySelectorAll('.particle').length > maxParticles) return;
 
         const p = document.createElement('div');
         p.className = 'particle';
         p.innerText = emojis[Math.floor(Math.random() * emojis.length)];
         p.style.left = Math.random() * 100 + 'vw';
-        p.style.animationDuration = (Math.random() * 3 + 4) + 's'; // От 4 до 7 секунд
-        p.style.fontSize = (Math.random() * 10 + 15) + 'px'; // Размер 15-25px
+        p.style.animationDuration = (Math.random() * 3 + 4) + 's';
+        p.style.fontSize = (Math.random() * 10 + 15) + 'px';
         document.body.appendChild(p);
 
         setTimeout(() => { p.remove(); }, 7000);
@@ -172,16 +185,19 @@ function setParticles(type) {
 function switchTab(tab) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-    setTimeout(() => { 
-        document.getElementById(`view-${tab}`).classList.add("active"); 
-        document.getElementById(`nav-${tab}`).classList.add("active"); 
-    }, 50);
+    
+    const targetView = document.getElementById(`view-${tab}`);
+    const targetNav = document.getElementById(`nav-${tab}`);
+    
+    if (targetView) targetView.classList.add("active");
+    if (targetNav) targetNav.classList.add("active");
     
     clearInterval(chatInterval);
     
     if (tab === "support") {
         renderedMessagesCount = 0;
-        document.getElementById("user-chat-box").innerHTML = ""; 
+        const b = document.getElementById("user-chat-box");
+        if (b) b.innerHTML = ""; 
         loadUserChat(); 
         chatInterval = setInterval(loadUserChat, 3000);
     } else if (tab === "quests") {
@@ -194,13 +210,20 @@ function switchTab(tab) {
 }
 
 function openModal(id, ptype = null) {
-    document.getElementById(id).classList.add("active");
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.add("active");
+    
     if (id === 'modal-purchase' && ptype) {
         document.getElementById('pur-type').value = ptype;
         document.getElementById("pur-amt").value = "";
         document.getElementById("pur-desc").value = "";
-        document.getElementById("pur-file").value = "";
-        document.getElementById("pur-file-label").innerText = "📸 Прикрепить фото (QR/Реквизиты)";
+        
+        const purFile = document.getElementById("pur-file");
+        if (purFile) purFile.value = "";
+        
+        const purLabel = document.getElementById("pur-file-label");
+        if (purLabel) purLabel.innerText = "📸 Прикрепить фото (QR/Реквизиты)";
         
         if (ptype === 'usdt') {
             document.getElementById('pur-title').innerText = "Покупка USDT (TRC-20)";
@@ -218,73 +241,158 @@ function openModal(id, ptype = null) {
     }
 }
 
-function closeModal(id) { document.getElementById(id).classList.remove("active"); }
+function closeModal(id) { 
+    const modal = document.getElementById(id);
+    if (modal) modal.classList.remove("active"); 
+}
 
 function setDep(el, method) {
     document.querySelectorAll("#modal-deposit .pill").forEach(p => p.classList.remove("active"));
-    el.classList.add("active"); depMethod = method; calcDep();
-    if (method === 'crypto') { document.getElementById("dep-file-box").classList.add("hidden"); document.getElementById("btn-dep-submit").innerText = "Перейти к оплате"; }
-    else { document.getElementById("dep-file-box").classList.remove("hidden"); document.getElementById("btn-dep-submit").innerText = "Отправить чек"; }
+    el.classList.add("active"); 
+    depMethod = method; 
+    calcDep();
+    
+    if (method === 'crypto') { 
+        document.getElementById("dep-file-box").classList.add("hidden"); 
+        document.getElementById("btn-dep-submit").innerText = "Перейти к оплате"; 
+    } else { 
+        document.getElementById("dep-file-box").classList.remove("hidden"); 
+        document.getElementById("btn-dep-submit").innerText = "Отправить чек"; 
+    }
 }
 
 function calcDep() {
     const v = parseFloat(document.getElementById("dep-amt").value) || 0;
-    document.getElementById("dep-hint").innerText = depMethod === 'crypto' ? `К оплате: ${(v * 1.4).toFixed(2)} ₽` : depMethod === 'kaspi' ? `К оплате: ${(v * 8).toFixed(2)} ₸` : `К оплате: ${(v * 0.8).toFixed(2)} ₴`;
+    const hint = document.getElementById("dep-hint");
+    if (!hint) return;
+    hint.innerText = depMethod === 'crypto' ? `К оплате: ${(v * 1.4).toFixed(2)} ₽` : depMethod === 'kaspi' ? `К оплате: ${(v * 8).toFixed(2)} ₸` : `К оплате: ${(v * 0.8).toFixed(2)} ₴`;
 }
 
 function calcUsdt() {
     if (document.getElementById('pur-type').value !== 'usdt') return;
-    document.getElementById("usdt-calc-hint").innerText = `Получите: ~${((parseFloat(document.getElementById("pur-amt").value) || 0) / 95).toFixed(2)} USDT`;
+    const hint = document.getElementById("usdt-calc-hint");
+    if (!hint) return;
+    hint.innerText = `Получите: ~${((parseFloat(document.getElementById("pur-amt").value) || 0) / 95).toFixed(2)} USDT`;
 }
 
 async function depSubmit() {
-    const btn = document.getElementById("btn-dep-submit"); if (btn.disabled) return;
+    const btn = document.getElementById("btn-dep-submit"); 
+    if (btn.disabled) return;
+    
     const amt = parseFloat(document.getElementById("dep-amt").value);
     if (!amt || amt < 100) return showToast("Минимум 100 ₽");
-    btn.disabled = true; const origText = btn.innerText; btn.innerText = "Обработка...";
+    
+    btn.disabled = true; 
+    const origText = btn.innerText; 
+    btn.innerText = "Обработка...";
+    
     try {
         if (depMethod !== 'crypto') {
             const file = document.getElementById("dep-file").files[0];
-            if (!file) throw new Error();
-            const fd = new FormData(); fd.append("initData", tg?.initData || ""); fd.append("amount_rub", amt); fd.append("currency", depMethod === 'kaspi' ? "KZT" : "UAH"); fd.append("receipt", file);
+            if (!file) throw new Error("Файл не выбран");
+            const fd = new FormData(); 
+            fd.append("initData", tg?.initData || ""); 
+            fd.append("amount_rub", amt); 
+            fd.append("currency", depMethod === 'kaspi' ? "KZT" : "UAH"); 
+            fd.append("receipt", file);
+            
             const r = await fetch("/api/deposit/pdf-receipt", { method: "POST", body: fd });
-            if (r.ok) { showToast("Чек передан в обработку!"); closeModal('modal-deposit'); }
+            if (r.ok) { 
+                showToast("Чек передан в обработку!"); 
+                closeModal('modal-deposit'); 
+            } else {
+                showToast("Ошибка отправки чека");
+            }
         } else {
-            const r = await fetch("/api/deposit/crypto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", amount_rub: amt }) });
+            const r = await fetch("/api/deposit/crypto", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json" }, 
+                body: JSON.stringify({ initData: tg?.initData || "", amount_rub: amt }) 
+            });
             const d = await r.json();
-            if (r.ok && d.pay_url) { tg?.openTelegramLink ? tg.openTelegramLink(d.pay_url) : window.open(d.pay_url); closeModal('modal-deposit'); }
+            if (r.ok && d.pay_url) { 
+                tg?.openTelegramLink ? tg.openTelegramLink(d.pay_url) : window.open(d.pay_url); 
+                closeModal('modal-deposit'); 
+            }
         }
-    } catch (e) { showToast("Ошибка. Проверьте файл и сумму."); }
-    finally { btn.disabled = false; btn.innerText = origText; }
+    } catch (e) { 
+        showToast("Ошибка. Проверьте файл и сумму."); 
+    } finally { 
+        btn.disabled = false; 
+        btn.innerText = origText; 
+    }
 }
 
 async function submitPurchase() {
-    const btn = document.getElementById("btn-pur"); if (btn.disabled) return;
-    const ptype = document.getElementById("pur-type").value, amt = parseFloat(document.getElementById("pur-amt").value), desc = document.getElementById("pur-desc").value;
+    const btn = document.getElementById("btn-pur"); 
+    if (btn.disabled) return;
+    
+    const ptype = document.getElementById("pur-type").value;
+    const amt = parseFloat(document.getElementById("pur-amt").value);
+    const desc = document.getElementById("pur-desc").value;
+    
     if (!amt || !desc) return showToast("Заполните все поля!");
     if (amt < 25) return showToast("Мин. сумма заказа 25 ₽");
-    btn.disabled = true; btn.innerText = "Отправка...";
+    
+    btn.disabled = true; 
+    btn.innerText = "Отправка...";
+    
     try {
-        const fd = new FormData(); fd.append("initData", tg?.initData || ""); fd.append("ptype", ptype); fd.append("amount", amt); fd.append("details", desc);
-        if (ptype === 'service' && document.getElementById("pur-file").files.length > 0) fd.append("photo", document.getElementById("pur-file").files[0]);
+        const fd = new FormData(); 
+        fd.append("initData", tg?.initData || ""); 
+        fd.append("ptype", ptype); 
+        fd.append("amount", amt); 
+        fd.append("details", desc);
+        
+        const photoInput = document.getElementById("pur-file");
+        if (ptype === 'service' && photoInput && photoInput.files.length > 0) {
+            fd.append("photo", photoInput.files[0]);
+        }
+        
         const r = await fetch("/api/purchase", { method: "POST", body: fd });
-        if (r.ok) { showToast("Заказ отправлен в работу!"); closeModal('modal-purchase'); await initApp(); } 
-        else showToast((await r.json()).detail || "Произошла ошибка");
-    } catch (e) { showToast("Сбой соединения."); }
-    finally { btn.disabled = false; btn.innerText = "Создать заказ"; }
+        if (r.ok) { 
+            showToast("Заказ отправлен в работу!"); 
+            closeModal('modal-purchase'); 
+            await initApp(); 
+        } else {
+            const err = await r.json();
+            showToast(err.detail || "Произошла ошибка");
+        }
+    } catch (e) { 
+        showToast("Сбой соединения."); 
+    } finally { 
+        btn.disabled = false; 
+        btn.innerText = "Создать заказ"; 
+    }
 }
 
 async function activatePromo() {
-    const code = document.getElementById("promo-input").value; if (!code) return;
+    const code = document.getElementById("promo-input").value; 
+    if (!code) return;
     try {
-        const r = await fetch("/api/promo/activate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", code: code }) });
+        const r = await fetch("/api/promo/activate", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ initData: tg?.initData || "", code: code }) 
+        });
         const d = await r.json();
-        if (r.ok) { showToast(`Активировано: +${d.amount} ₽ !`); closeModal('modal-promo'); await initApp(); } 
-        else showToast(d.detail || "Ошибка активации");
+        if (r.ok) { 
+            showToast(`Активировано: +${d.amount} ₽ !`); 
+            closeModal('modal-promo'); 
+            await initApp(); 
+        } else {
+            showToast(d.detail || "Ошибка активации");
+        }
     } catch (e) {}
 }
 
-function copyRef() { document.getElementById("ref-link").select(); document.execCommand("copy"); showToast("Ссылка скопирована!"); }
+function copyRef() { 
+    const link = document.getElementById("ref-link");
+    if (!link) return;
+    link.select(); 
+    document.execCommand("copy"); 
+    showToast("Ссылка скопирована!"); 
+}
 
 // --------- ЗАДАНИЯ (QUESTS) ---------
 async function loadQuests() {
@@ -292,6 +400,7 @@ async function loadQuests() {
         const r = await fetch(`/api/quests?initData=${encodeURIComponent(tg?.initData || "")}`);
         const d = await r.json();
         const b = document.getElementById("quests-list");
+        if (!b) return;
         b.innerHTML = "";
         d.quests.forEach(q => {
             let pct = Math.min((q.progress / q.max) * 100, 100);
@@ -317,6 +426,7 @@ async function loadReviews() {
         const r = await fetch(`/api/reviews?initData=${encodeURIComponent(tg?.initData || "")}`);
         const d = await r.json();
         const b = document.getElementById("reviews-list");
+        if (!b) return;
         b.innerHTML = "";
         d.reviews.forEach(rv => {
             let starsHtml = '⭐️'.repeat(rv.stars);
@@ -331,33 +441,47 @@ async function loadReviews() {
             </div>`;
         });
         if (d.reviews.length === 0) b.innerHTML = "<div style='font-size:12px; color:var(--text-secondary); text-align:center;'>Отзывов пока нет</div>";
-    } catch(e){}
+    } catch (e) {}
 }
 
 function setReviewStars(num) {
     currentReviewStars = num;
-    for(let i=1; i<=5; i++) {
+    for (let i = 1; i <= 5; i++) {
         const starEl = document.getElementById(`star-${i}`);
-        if(i <= num) { starEl.style.opacity = "1"; starEl.style.transform = "scale(1.2)"; } 
-        else { starEl.style.opacity = "0.3"; starEl.style.transform = "scale(1)"; }
+        if (!starEl) continue;
+        if (i <= num) { 
+            starEl.style.opacity = "1"; 
+            starEl.style.transform = "scale(1.2)"; 
+        } else { 
+            starEl.style.opacity = "0.3"; 
+            starEl.style.transform = "scale(1)"; 
+        }
     }
 }
 
 async function submitReview() {
-    if(!currentReviewTxId) return showToast("Оставить отзыв можно только по кнопке из уведомления!");
+    if (!currentReviewTxId) return showToast("Оставить отзыв можно только по кнопке из уведомления!");
     const txt = document.getElementById("review-text").value;
-    if(!txt) return showToast("Напишите текст отзыва!");
+    if (!txt) return showToast("Напишите текст отзыва!");
     try {
         const r = await fetch("/api/reviews", { 
-            method: "POST", headers: { "Content-Type": "application/json" }, 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
             body: JSON.stringify({ initData: tg?.initData || "", text: txt, stars: currentReviewStars, tx_id: currentReviewTxId }) 
         });
         const d = await r.json();
         if (r.ok) {
-            showToast("Спасибо за ваш отзыв!"); closeModal("modal-review-add"); document.getElementById("review-text").value = "";
-            currentReviewTxId = null; if (document.getElementById("view-reviews").classList.contains("active")) loadReviews();
-        } else showToast(d.detail || "Ошибка");
-    } catch(e){ showToast("Ошибка соединения"); }
+            showToast("Спасибо за ваш отзыв!"); 
+            closeModal("modal-review-add"); 
+            document.getElementById("review-text").value = "";
+            currentReviewTxId = null; 
+            if (document.getElementById("view-reviews").classList.contains("active")) loadReviews();
+        } else {
+            showToast(d.detail || "Ошибка");
+        }
+    } catch (e) { 
+        showToast("Ошибка соединения"); 
+    }
 }
 
 // --------- ПОДДЕРЖКА ---------
@@ -366,16 +490,20 @@ async function loadUserChat() {
         const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}`);
         const d = await r.json(); 
         const b = document.getElementById("user-chat-box");
+        if (!b) return;
         
         if (d.status === 'closed') {
             document.getElementById("sup-status").innerText = "Диалог завершен"; 
             document.getElementById("user-chat-input-wrap").classList.add("hidden"); 
             document.getElementById("btn-reopen-chat").classList.remove("hidden");
+        } else {
+            document.getElementById("sup-status").innerText = "Чат с поддержкой"; 
+            document.getElementById("user-chat-input-wrap").classList.remove("hidden"); 
+            document.getElementById("btn-reopen-chat").classList.add("hidden");
         }
         
-        // Append-Only
         if (d.messages.length > renderedMessagesCount) {
-            for(let i = renderedMessagesCount; i < d.messages.length; i++) {
+            for (let i = renderedMessagesCount; i < d.messages.length; i++) {
                 let m = d.messages[i];
                 let div = document.createElement('div');
                 div.className = `msg ${m.sender === 'user' ? 'right' : 'left'}`;
@@ -395,10 +523,9 @@ function reopenChat() {
     let secs = 10;
     document.getElementById("sup-status").innerText = `Поиск оператора... ${secs}с`;
     
-    // Инпут разблокирован. Таймер просто визуально тикает, давая фору
     const intv = setInterval(() => {
         secs--;
-        if(secs > 0) {
+        if (secs > 0) {
             document.getElementById("sup-status").innerText = `Поиск оператора... ${secs}с`;
         } else {
             clearInterval(intv);
@@ -408,8 +535,15 @@ function reopenChat() {
 }
 
 async function sendMsgUser() {
-    const i = document.getElementById("user-chat-input"), v = i.value.trim(); if (!v) return; i.value = "";
-    await fetch("/api/support/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", text: v }) }); 
+    const i = document.getElementById("user-chat-input");
+    const v = i.value.trim(); 
+    if (!v) return; 
+    i.value = "";
+    await fetch("/api/support/send", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ initData: tg?.initData || "", text: v }) 
+    }); 
     loadUserChat();
 }
 
@@ -417,7 +551,7 @@ async function sendMsgUser() {
 async function loadAdminData() {
     try {
         const rs = await fetch(`/api/admin/stats?initData=${encodeURIComponent(tg?.initData || "")}`);
-        if(rs.ok) {
+        if (rs.ok) {
             const st = await rs.json();
             document.getElementById("stat-turnover").innerText = st.turnover.toLocaleString();
             document.getElementById("stat-conv").innerText = `${st.conversion}%`;
@@ -425,72 +559,111 @@ async function loadAdminData() {
             document.getElementById("stat-profit-kzt").innerText = st.profit_kzt.toLocaleString();
         }
         const rt = await fetch(`/api/admin/tickets?initData=${encodeURIComponent(tg?.initData || "")}`);
-        if(rt.ok) {
+        if (rt.ok) {
             const tk = await rt.json();
-            const b = document.getElementById("admin-chat-list"); b.innerHTML = "";
-            tk.forEach(t => { b.innerHTML += `<div class="pill" onclick="openAdminChat(${t.user_id}, '${t.first_name}')">💬 ${t.first_name} (ID: ${t.user_id})</div>`; });
-            if (tk.length === 0) b.innerHTML = "<div style='font-size:12px; color:var(--text-secondary); text-align:center;'>Нет открытых чатов</div>";
+            const b = document.getElementById("admin-chat-list"); 
+            if (b) {
+                b.innerHTML = "";
+                tk.forEach(t => { 
+                    b.innerHTML += `<div class="pill" onclick="openAdminChat(${t.user_id}, '${t.first_name}')">💬 ${t.first_name} (ID: ${t.user_id})</div>`; 
+                });
+                if (tk.length === 0) b.innerHTML = "<div style='font-size:12px; color:var(--text-secondary); text-align:center;'>Нет открытых чатов</div>";
+            }
         }
     } catch (e) {}
 }
 
 async function adminCreatePromo() {
-    const code = document.getElementById("adm-promo-code").value, amt = document.getElementById("adm-promo-amt").value, uses = document.getElementById("adm-promo-uses").value;
-    if(!code || !amt || !uses) return showToast("Заполните все поля");
+    const code = document.getElementById("adm-promo-code").value;
+    const amt = document.getElementById("adm-promo-amt").value;
+    const uses = document.getElementById("adm-promo-uses").value;
+    if (!code || !amt || !uses) return showToast("Заполните все поля");
     try {
-        const r = await fetch("/api/admin/promo/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", code: code, amount: amt, max_uses: uses }) });
-        if(r.ok) { showToast("Промокод создан!"); document.getElementById("adm-promo-code").value = ""; } 
-        else showToast("Код уже существует");
-    } catch(e) {}
+        const r = await fetch("/api/admin/promo/create", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ initData: tg?.initData || "", code: code, amount: amt, max_uses: uses }) 
+        });
+        if (r.ok) { 
+            showToast("Промокод создан!"); 
+            document.getElementById("adm-promo-code").value = ""; 
+        } else {
+            showToast("Код уже существует");
+        }
+    } catch (e) {}
 }
 
 async function adminExecSql() {
-    const query = document.getElementById("adm-sql-input").value; if(!query) return;
+    const query = document.getElementById("adm-sql-input").value; 
+    if (!query) return;
     try {
-        const r = await fetch("/api/admin/sql", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", query: query }) });
+        const r = await fetch("/api/admin/sql", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ initData: tg?.initData || "", query: query }) 
+        });
         const d = await r.json();
         const resBox = document.getElementById("adm-sql-res");
-        resBox.style.display = "block"; resBox.innerText = JSON.stringify(d, null, 2);
-    } catch(e) {}
+        if (resBox) {
+            resBox.style.display = "block"; 
+            resBox.innerText = JSON.stringify(d, null, 2);
+        }
+    } catch (e) {}
 }
 
 async function openAdminChat(uid, name) {
-    activeAdminChatUser = uid; document.getElementById("view-admin").classList.remove("active");
+    activeAdminChatUser = uid; 
+    document.getElementById("view-admin").classList.remove("active");
     setTimeout(() => document.getElementById("view-admin-chat").classList.add("active"), 50);
     
     clearInterval(chatInterval);
     renderedAdminMessagesCount = 0;
-    document.getElementById("admin-chat-box").innerHTML = ""; 
+    const b = document.getElementById("admin-chat-box");
+    if (b) b.innerHTML = ""; 
     
     const fetchChat = async () => {
         const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}&target_uid=${uid}`);
         const d = await r.json(); 
-        const b = document.getElementById("admin-chat-box");
+        const box = document.getElementById("admin-chat-box");
+        if (!box) return;
         
         if (d.messages.length > renderedAdminMessagesCount) {
-            for(let i = renderedAdminMessagesCount; i < d.messages.length; i++) {
+            for (let i = renderedAdminMessagesCount; i < d.messages.length; i++) {
                 let m = d.messages[i];
                 let div = document.createElement('div');
                 div.className = `msg ${m.sender === 'user' ? 'left' : 'right'}`;
                 div.innerHTML = `<div>${m.text}</div>`;
-                b.appendChild(div);
+                box.appendChild(div);
             }
-            b.scrollTop = b.scrollHeight;
+            box.scrollTop = box.scrollHeight;
             renderedAdminMessagesCount = d.messages.length;
         }
     };
-    fetchChat(); chatInterval = setInterval(fetchChat, 3000);
+    fetchChat(); 
+    chatInterval = setInterval(fetchChat, 3000);
 }
 
 async function sendMsgAdmin() {
-    const i = document.getElementById("admin-chat-input"), v = i.value.trim(); if (!v || !activeAdminChatUser) return; i.value = "";
-    await fetch("/api/support/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", text: v, target_uid: activeAdminChatUser }) });
+    const i = document.getElementById("admin-chat-input");
+    const v = i.value.trim(); 
+    if (!v || !activeAdminChatUser) return; 
+    i.value = "";
+    await fetch("/api/support/send", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ initData: tg?.initData || "", text: v, target_uid: activeAdminChatUser }) 
+    });
 }
 
 async function closeSupportAdmin(action) {
     if (!activeAdminChatUser) return;
-    await fetch("/api/support/close", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", target_uid: activeAdminChatUser, action: action }) });
-    showToast("Чат закрыт!"); switchTab('admin');
+    await fetch("/api/support/close", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ initData: tg?.initData || "", target_uid: activeAdminChatUser, action: action }) 
+    });
+    showToast("Чат закрыт!"); 
+    switchTab('admin');
 }
 
 window.onload = initApp;
