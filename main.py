@@ -21,6 +21,7 @@ WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/swapaapaaAPP_bot/app")
 SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 CRYPTO_RATE_MULTIPLIER = 1.4
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://swappay-app.onrender.com")
 
 crypto_invoices = {}
 
@@ -233,7 +234,16 @@ async def tg_polling_worker():
                                     await answer_callback_query(cb_id, "Заказ выполнен!")
                                     
                                     # Отзыв через прямую ссылку url с параметром startapp
-                                    review_markup = {"inline_keyboard": [[{"text": "⭐️ Оценить работу", "url": f"{WEBAPP_URL}?startapp=review_{tx_id}"}]]}
+                                    review_markup = {
+    "inline_keyboard": [
+        [
+            {
+                "text": "⭐️ Оценить работу", 
+                "web_app": {"url": f"{WEBAPP_URL}?startapp=review_{tx_id}"}
+            }
+        ]
+    ]
+}
                                     user_msg = f"✅ <b>Ваш заказ #{tx_id} на сумму {tx['amount_rub']} ₽ успешно выполнен!</b>\n\nПожалуйста, уделите секунду и оставьте отзыв 👇"
                                     
                                     await send_tg_message(tx["user_id"], user_msg, review_markup)
