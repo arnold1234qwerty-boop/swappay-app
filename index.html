@@ -20,44 +20,65 @@
             background-color: var(--bg-body);
             background-size: cover; background-position: center; background-attachment: fixed;
             color: var(--text-primary); 
-            overflow: hidden; /* Запрещаем скролл body, скроллим только внутри view */
+            overflow: hidden; /* Запрет скролла всей страницы, фиксирует фон */
             height: var(--tg-viewport-stable-height, 100vh);
             display: flex;
             justify-content: center;
         }
 
-        .container { 
-            width: 100%; 
-            max-width: 440px; 
-            height: 100%; 
-            position: relative; 
+        /* --- GLASSMORPHISM ДЛЯ КАСТОМНЫХ ОБОЕВ --- */
+        body.custom-bg-active .card,
+        body.custom-bg-active .banner,
+        body.custom-bg-active .btn {
+            background: rgba(19, 27, 38, 0.4) !important;
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        body.custom-bg-active .btn.primary {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(30, 58, 138, 0.7)) !important;
+        }
+        body.custom-bg-active .input-box,
+        body.custom-bg-active .pill {
+            background: rgba(26, 37, 54, 0.4) !important;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        body.custom-bg-active .nav {
+            background: rgba(0, 0, 0, 0.5) !important;
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        }
+        body.custom-bg-active .modal-content {
+            background: rgba(19, 27, 38, 0.75) !important;
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
         }
 
-        /* Независимые экраны */
+        .container { width: 100%; max-width: 440px; height: 100%; position: relative; }
+
+        /* Экраны-вкладки */
         .view { 
             opacity: 0; transform: translateX(20px); pointer-events: none; 
             transition: opacity 0.3s ease, transform 0.3s ease; 
-            position: absolute; inset: 0; /* Растягиваем на 100% контейнера */
-            visibility: hidden; 
-            padding: 15px 15px 80px 15px; /* 80px отступ снизу для навигации */
-            overflow-y: auto; /* Независимый скролл для каждой вкладки */
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            position: absolute; inset: 0; visibility: hidden; 
+            padding: 15px 15px 85px 15px; /* Отступ снизу для меню */
+            overflow-y: auto; display: flex; flex-direction: column;
         }
-        .view.active { 
-            opacity: 1; transform: translateX(0); pointer-events: auto; visibility: visible; 
-        }
+        .view.active { opacity: 1; transform: translateX(0); pointer-events: auto; visibility: visible; }
         
+        /* Блок для жесткого центрирования элементов по вертикали (Главное меню) */
+        .wrapper-center {
+            margin: auto 0; /* Автоматические отступы сверху и снизу сжимают контент к центру */
+            display: flex; flex-direction: column; gap: 12px;
+        }
+
         /* Модальные окна */
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .modal.active { opacity: 1; pointer-events: auto; }
-        .modal-content { width: 100%; max-width: 440px; background: var(--bg-card); border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); max-height: 90vh; overflow-y: auto;}
+        .modal-content { width: 100%; max-width: 440px; background: var(--bg-card); border-radius: 22px 22px 0 0; padding: 20px 20px 30px; border-top: 1px solid var(--border); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); max-height: 90vh; overflow-y: auto;}
         .modal.active .modal-content { transform: translateY(0); }
 
         /* Элементы UI */
         .banner { background: linear-gradient(135deg, var(--accent-grad1), var(--accent-grad2)); border-radius: 18px; padding: 18px; position: relative; }
-        .card { background: var(--bg-card); border-radius: 18px; padding: 18px; border: 1px solid var(--border); backdrop-filter: blur(10px); }
+        .card { background: var(--bg-card); border-radius: 18px; padding: 18px; border: 1px solid var(--border); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
         
         .btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
@@ -71,14 +92,14 @@
         .pill.active { border-color: var(--accent-main); background: rgba(255,255,255,0.05); }
 
         /* Чаты */
-        .chat-box { height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; scroll-behavior: smooth; }
+        .chat-box { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; scroll-behavior: smooth; min-height: 40vh; }
         .msg { max-width: 80%; padding: 10px 14px; font-size: 13.5px; word-wrap: break-word; }
         .msg.left { align-self: flex-start; background: var(--bg-inner); border-radius: 0 14px 14px 14px; }
         .msg.right { align-self: flex-end; background: var(--accent-main); border-radius: 14px 0 14px 14px; }
         
         /* Навигация */
-        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; backdrop-filter: blur(10px); }
-        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0 15px; z-index: 50; }
+        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1;}
         .nav-btn.active { color: var(--accent-main); }
         .hidden { display: none !important; }
 
@@ -94,8 +115,8 @@
         
         <!-- ГЛАВНЫЙ ЭКРАН -->
         <div id="view-home" class="view active">
-            <!-- Обертка для жесткой центровки по вертикали -->
-            <div style="margin: auto 0; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Обертка для идеального центрирования кнопок -->
+            <div class="wrapper-center">
                 <div class="banner">
                     <h2 style="font-weight: 800; font-size: 22px;">SwapPay</h2>
                     <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;" id="user-display">Добро пожаловать</div>
@@ -105,17 +126,17 @@
                     <input type="file" id="custom-bg-input" accept="image/*" class="hidden" onchange="loadCustomBg(this)">
                 </div>
                 
-                <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+                <div class="card" style="display: flex; flex-direction: column; justify-content: center; text-align: center;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">ОСНОВНОЙ БАЛАНС</span>
                         <span id="role-badge" style="color: var(--accent-main); font-size: 11px; font-weight: 800;">USER</span>
                     </div>
-                    <div style="font-size: 36px; font-weight: 800; margin: 5px 0;"><span id="bal-rub">0.00</span> <span style="color:var(--accent-main);">₽</span></div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Бонусы: <b id="bal-bonus" style="color:#10b981;">0.00 ₽</b></div>
+                    <div style="font-size: 40px; font-weight: 800; margin: 8px 0;"><span id="bal-rub">0.00</span> <span style="color:var(--accent-main); font-size: 30px;">₽</span></div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Бонусные рубли: <b id="bal-bonus" style="color:#10b981;">0.00 ₽</b></div>
                 </div>
                 
                 <div class="grid-2">
-                    <button class="btn primary" onclick="openModal('modal-deposit')" style="grid-column: span 2;">💳 Пополнить баланс</button>
+                    <button class="btn primary" onclick="openModal('modal-deposit')" style="grid-column: span 2; font-size: 15px; padding: 16px;">💳 Пополнить баланс</button>
                     <button class="btn" onclick="openModal('modal-purchase', 'service')">🛍 Оплатить услугу</button>
                     <button class="btn" onclick="openModal('modal-purchase', 'usdt')">💎 Купить USDT</button>
                     <button class="btn" onclick="openModal('modal-referrals')">👥 Рефералы</button>
@@ -125,11 +146,25 @@
             </div>
         </div>
 
+        <!-- ЗАДАНИЯ -->
+        <div id="view-quests" class="view">
+            <div class="wrapper-center" style="margin-top: 0;"> <!-- Прижимаем к верху -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="font-size: 18px;">Еженедельные задания</h3>
+                    </div>
+                    <div id="quests-list" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Рендер заданий из app.js -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ОТЗЫВЫ -->
         <div id="view-reviews" class="view">
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3>Отзывы</h3>
+            <div class="card" style="min-height: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="font-size: 18px;">Отзывы клиентов</h3>
                 </div>
                 <div id="reviews-list" style="display:flex; flex-direction:column; gap:10px;">
                     <!-- Рендер отзывов -->
@@ -140,8 +175,8 @@
         <!-- ПОДДЕРЖКА -->
         <div id="view-support" class="view">
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
-                <h3 id="sup-status">Чат с поддержкой</h3>
-                <div class="chat-box" id="user-chat-box" style="flex-grow: 1;"></div>
+                <h3 id="sup-status" style="font-size: 18px; margin-bottom: 5px;">Чат с поддержкой</h3>
+                <div class="chat-box" id="user-chat-box"></div>
                 <button id="btn-reopen-chat" class="btn hidden" style="margin-top: 10px;" onclick="reopenChat()">Начать новый диалог</button>
                 <div id="user-chat-input-wrap" style="display: flex; gap: 8px; margin-top: 10px;">
                     <input type="text" id="user-chat-input" class="input-box" style="margin:0;" placeholder="Сообщение...">
@@ -202,7 +237,7 @@
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <button class="btn" style="padding: 5px 10px; margin-bottom: 10px; width: auto; align-self: flex-start;" onclick="switchTab('admin')">🔙 Назад</button>
                 <h3 id="admin-chat-title">Чат</h3>
-                <div class="chat-box" id="admin-chat-box" style="flex-grow: 1;"></div>
+                <div class="chat-box" id="admin-chat-box"></div>
                 <div style="display: flex; gap: 8px; margin-top: 10px;">
                     <input type="text" id="admin-chat-input" class="input-box" style="margin:0;">
                     <button class="btn primary" style="padding: 0 15px; width: auto;" onclick="sendMsgAdmin()">➤</button>
@@ -223,7 +258,6 @@
                 <span onclick="closeModal('modal-review-add')" style="cursor:pointer; font-size:20px;">✕</span>
             </div>
             
-            <!-- Звездный рейтинг -->
             <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; font-size: 35px;">
                 <span id="star-1" onclick="setReviewStars(1)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
                 <span id="star-2" onclick="setReviewStars(2)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
@@ -320,10 +354,11 @@
 
     <!-- НАВИГАЦИЯ -->
     <div class="nav">
-        <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">🏠<br>Кабинет</button>
-        <button class="nav-btn" id="nav-support" onclick="switchTab('support')">💬<br>Поддержка</button>
-        <button class="nav-btn" id="nav-reviews" onclick="switchTab('reviews')">⭐️<br>Отзывы</button>
-        <button class="nav-btn hidden" id="nav-admin" onclick="switchTab('admin')">🛡<br>Админка</button>
+        <button class="nav-btn active" id="nav-home" onclick="switchTab('home')"><span style="font-size: 18px;">🏠</span> Кабинет</button>
+        <button class="nav-btn" id="nav-quests" onclick="switchTab('quests')"><span style="font-size: 18px;">🎯</span> Задания</button>
+        <button class="nav-btn" id="nav-support" onclick="switchTab('support')"><span style="font-size: 18px;">💬</span> Поддержка</button>
+        <button class="nav-btn" id="nav-reviews" onclick="switchTab('reviews')"><span style="font-size: 18px;">⭐️</span> Отзывы</button>
+        <button class="nav-btn hidden" id="nav-admin" onclick="switchTab('admin')"><span style="font-size: 18px;">🛡</span> Админка</button>
     </div>
 
     <script src="app.js"></script>
