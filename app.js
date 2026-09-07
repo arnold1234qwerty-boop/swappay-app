@@ -90,10 +90,14 @@ async function initApp() {
 
             if (user.role === "admin") document.getElementById("nav-admin").classList.remove("hidden");
             
-            const startParam = tg?.initDataUnsafe?.start_param;
-            if (startParam && startParam.startsWith('review_')) {
-                currentReviewTxId = parseInt(startParam.split('_')[1]);
-                openModal('modal-review-add');
+            // Проверяем Telegram start_param ИЛИ обычные GET-параметры URL (?startapp=...)
+const urlParams = new URLSearchParams(window.location.search);
+const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('startapp');
+
+if (startParam && startParam.startsWith('review_')) {
+    currentReviewTxId = parseInt(startParam.split('_')[1]);
+    openModal('modal-review-add');
+}
             }
         }
     } catch (e) { showToast("Ошибка связи с сервером"); }
