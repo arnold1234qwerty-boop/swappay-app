@@ -20,13 +20,13 @@
             background-color: var(--bg-body);
             background-size: cover; background-position: center; background-attachment: fixed;
             color: var(--text-primary); 
-            overflow: hidden; /* Запрет скролла всей страницы, фиксирует фон */
+            overflow: hidden; /* Запрет скролла body для статики фона */
             height: var(--tg-viewport-stable-height, 100vh);
             display: flex;
             justify-content: center;
         }
 
-        /* --- GLASSMORPHISM ДЛЯ КАСТОМНЫХ ОБОЕВ --- */
+        /* --- GLASSMORPHISM (Активируется JS-скриптом при кастомном фоне) --- */
         body.custom-bg-active .card,
         body.custom-bg-active .banner,
         body.custom-bg-active .btn {
@@ -48,7 +48,7 @@
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
         }
         body.custom-bg-active .modal-content {
-            background: rgba(19, 27, 38, 0.75) !important;
+            background: rgba(19, 27, 38, 0.85) !important;
             backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
         }
 
@@ -59,16 +59,13 @@
             opacity: 0; transform: translateX(20px); pointer-events: none; 
             transition: opacity 0.3s ease, transform 0.3s ease; 
             position: absolute; inset: 0; visibility: hidden; 
-            padding: 15px 15px 85px 15px; /* Отступ снизу для меню */
+            padding: 15px 15px 85px 15px; 
             overflow-y: auto; display: flex; flex-direction: column;
         }
         .view.active { opacity: 1; transform: translateX(0); pointer-events: auto; visibility: visible; }
         
-        /* Блок для жесткого центрирования элементов по вертикали (Главное меню) */
-        .wrapper-center {
-            margin: auto 0; /* Автоматические отступы сверху и снизу сжимают контент к центру */
-            display: flex; flex-direction: column; gap: 12px;
-        }
+        /* Блок для жесткого центрирования */
+        .wrapper-center { margin: auto 0; display: flex; flex-direction: column; gap: 12px; }
 
         /* Модальные окна */
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
@@ -77,18 +74,20 @@
         .modal.active .modal-content { transform: translateY(0); }
 
         /* Элементы UI */
-        .banner { background: linear-gradient(135deg, var(--accent-grad1), var(--accent-grad2)); border-radius: 18px; padding: 18px; position: relative; }
+        .banner { background: linear-gradient(135deg, var(--accent-grad1), var(--accent-grad2)); border-radius: 18px; padding: 18px; position: relative; display: flex; flex-direction: column; gap: 8px;}
         .card { background: var(--bg-card); border-radius: 18px; padding: 18px; border: 1px solid var(--border); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
         
-        .btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
-        .btn:active { transform: scale(0.97); }
+        /* Физика кнопок (уменьшение при клике) */
+        .btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; transition: transform 0.1s ease, background 0.3s; }
+        .btn:active { transform: scale(0.95); }
         .btn.primary { background: linear-gradient(135deg, var(--accent-grad2), var(--accent-grad1)); border: none; }
         .btn.danger { background: #dc2626; border: none; }
-        .btn:disabled { opacity: 0.5; pointer-events: none; }
+        .btn:disabled { opacity: 0.5; pointer-events: none; transform: scale(1); }
         
         .input-box { width: 100%; background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; color: #fff; margin-bottom: 10px; outline: none; }
-        .pill { background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; font-size: 13px;}
+        .pill { background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; font-size: 13px; transition: transform 0.1s ease;}
+        .pill:active { transform: scale(0.98); }
         .pill.active { border-color: var(--accent-main); background: rgba(255,255,255,0.05); }
 
         /* Чаты */
@@ -99,7 +98,8 @@
         
         /* Навигация */
         .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0 15px; z-index: 50; }
-        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1;}
+        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 11px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; transition: transform 0.1s;}
+        .nav-btn:active { transform: scale(0.9); }
         .nav-btn.active { color: var(--accent-main); }
         .hidden { display: none !important; }
 
@@ -115,15 +115,22 @@
         
         <!-- ГЛАВНЫЙ ЭКРАН -->
         <div id="view-home" class="view active">
-            <!-- Обертка для идеального центрирования кнопок -->
             <div class="wrapper-center">
                 <div class="banner">
-                    <h2 style="font-weight: 800; font-size: 22px;">SwapPay</h2>
-                    <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;" id="user-display">Добро пожаловать</div>
-                    <select id="theme-select" onchange="changeTheme()" style="position:absolute; right:15px; top:15px; background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:4px; outline:none; font-size: 12px; cursor: pointer;">
-                        <option value="basic">Базовая тема</option><option value="red">Красная</option><option value="purple">Фиолетовая</option><option value="pink">Розовая</option><option value="neon">Неон</option><option value="custom">🖼 Свое фото</option>
-                    </select>
-                    <input type="file" id="custom-bg-input" accept="image/*" class="hidden" onchange="loadCustomBg(this)">
+                    <div>
+                        <h2 style="font-weight: 800; font-size: 22px;">SwapPay</h2>
+                        <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;" id="user-display">Добро пожаловать</div>
+                    </div>
+                    <!-- Блок с селекторами для дизайна -->
+                    <div style="display: flex; gap: 8px; margin-top: 5px;">
+                        <select id="theme-select" onchange="changeTheme()" style="background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:6px; outline:none; font-size: 11px; flex: 1;">
+                            <option value="basic">Тема: База</option><option value="red">Красная</option><option value="purple">Фиолет</option><option value="pink">Розовая</option><option value="neon">Неон</option><option value="custom">🖼 Свое фото</option>
+                        </select>
+                        <select id="particles-select" onchange="changeParticles()" style="background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:6px; outline:none; font-size: 11px; flex: 1;">
+                            <option value="none">Эффекты: Выкл</option><option value="snow">❄️ Снег</option><option value="leaves">🍂 Листья</option><option value="money">💸 Деньги</option><option value="water">🛢️ Бутылки 5л</option>
+                        </select>
+                        <input type="file" id="custom-bg-input" accept="image/*" class="hidden" onchange="loadCustomBg(this)">
+                    </div>
                 </div>
                 
                 <div class="card" style="display: flex; flex-direction: column; justify-content: center; text-align: center;">
@@ -148,7 +155,7 @@
 
         <!-- ЗАДАНИЯ -->
         <div id="view-quests" class="view">
-            <div class="wrapper-center" style="margin-top: 0;"> <!-- Прижимаем к верху -->
+            <div class="wrapper-center" style="margin-top: 0;">
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3 style="font-size: 18px;">Еженедельные задания</h3>
@@ -175,7 +182,7 @@
         <!-- ПОДДЕРЖКА -->
         <div id="view-support" class="view">
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
-                <h3 id="sup-status" style="font-size: 18px; margin-bottom: 5px;">Чат с поддержкой</h3>
+                <h3 id="sup-status" style="font-size: 16px; margin-bottom: 5px; color: var(--accent-main);">Чат с поддержкой</h3>
                 <div class="chat-box" id="user-chat-box"></div>
                 <button id="btn-reopen-chat" class="btn hidden" style="margin-top: 10px;" onclick="reopenChat()">Начать новый диалог</button>
                 <div id="user-chat-input-wrap" style="display: flex; gap: 8px; margin-top: 10px;">
@@ -237,7 +244,7 @@
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <button class="btn" style="padding: 5px 10px; margin-bottom: 10px; width: auto; align-self: flex-start;" onclick="switchTab('admin')">🔙 Назад</button>
                 <h3 id="admin-chat-title">Чат</h3>
-                <div class="chat-box" id="admin-chat-box"></div>
+                <div class="chat-box" id="admin-chat-box" style="flex-grow: 1;"></div>
                 <div style="display: flex; gap: 8px; margin-top: 10px;">
                     <input type="text" id="admin-chat-input" class="input-box" style="margin:0;">
                     <button class="btn primary" style="padding: 0 15px; width: auto;" onclick="sendMsgAdmin()">➤</button>
@@ -259,11 +266,11 @@
             </div>
             
             <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; font-size: 35px;">
-                <span id="star-1" onclick="setReviewStars(1)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
-                <span id="star-2" onclick="setReviewStars(2)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
-                <span id="star-3" onclick="setReviewStars(3)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
-                <span id="star-4" onclick="setReviewStars(4)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
-                <span id="star-5" onclick="setReviewStars(5)" style="cursor:pointer; transition: 0.2s;">⭐️</span>
+                <span id="star-1" onclick="setReviewStars(1)" style="cursor:pointer; transition: transform 0.2s;">⭐️</span>
+                <span id="star-2" onclick="setReviewStars(2)" style="cursor:pointer; transition: transform 0.2s;">⭐️</span>
+                <span id="star-3" onclick="setReviewStars(3)" style="cursor:pointer; transition: transform 0.2s;">⭐️</span>
+                <span id="star-4" onclick="setReviewStars(4)" style="cursor:pointer; transition: transform 0.2s;">⭐️</span>
+                <span id="star-5" onclick="setReviewStars(5)" style="cursor:pointer; transition: transform 0.2s;">⭐️</span>
             </div>
 
             <textarea id="review-text" class="input-box" placeholder="Напишите пару слов о том, как прошел заказ..." style="height: 100px;"></textarea>
