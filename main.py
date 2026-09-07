@@ -15,13 +15,11 @@ import httpx
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN")
 LOG_CHAT_ID = os.getenv("LOG_CHAT_ID", "-5401409248")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://google.com") # Замените на ссылку вашего Mini App
 SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 
 CRYPTO_RATE_MULTIPLIER = 1.4
-USDT_RATE = 95.0
-KZT_RATE = 8.0
-UAH_RATE = 0.8
 
 crypto_invoices = {}
 
@@ -53,6 +51,7 @@ def init_db():
         user_id INTEGER,
         type TEXT,
         amount_rub REAL,
+        bonus_used REAL DEFAULT 0.0,
         currency TEXT,
         status TEXT,
         receipt_filename TEXT DEFAULT NULL,
@@ -99,14 +98,16 @@ async def send_tg_message(chat_id, text: str, reply_markup=None):
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
     if reply_markup: payload["reply_markup"] = reply_markup
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(url, json=payload)
+        async with httpx.AsyncClient() as client: await client.post(url, json=payload)
     except Exception: pass
 
-async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: str, reply_markup=None):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: str, reply_markup=None, is_photo=False):
+    endpoint = "sendPhoto" if is_photo else "sendDocument"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{endpoint}"
     try:
-        files = {"document": (filename, file_bytes, "application/pdf")}
+        file_field = "photo" if is_photo else "document"
+        mime = "image/jpeg" if is_photo else "application/pdf"
+        files = {file_field: (filename, file_bytes, mime)}
         data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
         if reply_markup: data["reply_markup"] = json.dumps(reply_markup)
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -116,8 +117,7 @@ async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: s
 async def answer_callback_query(callback_query_id: str, text: str, show_alert: bool = False):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery"
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(url, json={"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert})
+        async with httpx.AsyncClient() as client: await client.post(url, json={"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert})
     except Exception: pass
 
 async def edit_message_text(chat_id, message_id, text, reply_markup=None):
@@ -125,8 +125,7 @@ async def edit_message_text(chat_id, message_id, text, reply_markup=None):
     payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML"}
     if reply_markup is not None: payload["reply_markup"] = reply_markup
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(url, json=payload)
+        async with httpx.AsyncClient() as client: await client.post(url, json=payload)
     except Exception: pass
 
 async def tg_polling_worker():
@@ -140,31 +139,45 @@ async def tg_polling_worker():
                     for update in resp.json().get("result", []):
                         offset = update["update_id"] + 1
                         
-                        # Обработка ответов (Reply) от админов (Причина отклонения заказа)
-                        if "message" in update:
+                        # Обработка обычных сообщений (Команда /start)
+                        if "message" in update and "text" in update["message"]:
                             msg = update["message"]
-                            if "reply_to_message" in msg and "text" in msg:
-                                reply_text = msg["reply_to_message"].get("text", "")
+                            chat_id = msg["chat"]["id"]
+                            text = msg["text"]
+
+                            # Если это ответ админа (Отклонение заказа)
+                            if "reply_to_message" in msg:
+                                reply_text = msg["reply_to_message"].get("text", msg["reply_to_message"].get("caption", ""))
                                 match = re.search(r'Заказ #(\d+)', reply_text)
                                 if match:
                                     tx_id = int(match.group(1))
-                                    reason = msg["text"]
-                                    
+                                    reason = text
                                     conn = get_db()
                                     cur = conn.cursor()
-                                    cur.execute("SELECT status, user_id, amount_rub FROM transactions WHERE id = ? AND status = 'pending'", (tx_id,))
+                                    cur.execute("SELECT status, user_id, amount_rub, bonus_used FROM transactions WHERE id = ? AND status = 'pending'", (tx_id,))
                                     tx = cur.fetchone()
                                     if tx:
-                                        # Возврат средств и смена статуса
-                                        cur.execute("UPDATE users SET balance_rub = balance_rub + ? WHERE user_id = ?", (tx["amount_rub"], tx["user_id"]))
+                                        # Корректный возврат средств
+                                        rub_to_return = tx["amount_rub"] - tx["bonus_used"]
+                                        cur.execute("UPDATE users SET balance_rub = balance_rub + ?, bonus_balance = bonus_balance + ? WHERE user_id = ?", 
+                                                    (rub_to_return, tx["bonus_used"], tx["user_id"]))
                                         cur.execute("UPDATE transactions SET status = 'rejected' WHERE id = ?", (tx_id,))
                                         conn.commit()
-                                        
-                                        # Уведомление пользователя
                                         await send_tg_message(tx["user_id"], f"❌ <b>Ваш заказ #{tx_id} отклонен!</b>\nПричина: <i>{reason}</i>\nСредства возвращены на баланс.")
-                                        # Обновление админского сообщения
-                                        await edit_message_text(msg["chat"]["id"], msg["reply_to_message"]["message_id"], reply_text + f"\n\n❌ <b>Отклонен:</b> {reason}", {"inline_keyboard": []})
+                                        await send_tg_message(LOG_CHAT_ID, f"Заказ #{tx_id} отклонен. Пользователь уведомлен.")
                                     conn.close()
+                            
+                            # Команда /start
+                            elif text.startswith("/start"):
+                                markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "web_app": {"url": WEBAPP_URL}}]]}
+                                welcome_text = (
+                                    "👋 <b>Добро пожаловать в SwapPay!</b>\n\n"
+                                    "Мы помогаем оплачивать покупки на RU маркетплейсах, "
+                                    "зарубежных сервисах и продаем USDT за местную валюту.\n\n"
+                                    "Вся работа, пополнения и заказы происходят внутри нашего удобного Mini App.\n\n"
+                                    "👇 Нажмите кнопку ниже, чтобы начать!"
+                                )
+                                await send_tg_message(chat_id, welcome_text, markup)
 
                         # Обработка инлайн кнопок
                         if "callback_query" in update:
@@ -173,7 +186,6 @@ async def tg_polling_worker():
                             msg = cb.get("message", {})
                             chat_id, msg_id = msg.get("chat", {}).get("id"), msg.get("message_id")
 
-                            # Депозиты
                             if cb_data.startswith("accept_tx_") or cb_data.startswith("reject_tx_"):
                                 tx_id = int(cb_data.split("_")[2])
                                 action = cb_data.split("_")[0]
@@ -182,21 +194,20 @@ async def tg_polling_worker():
                                 cur.execute("SELECT status, user_id, amount_rub FROM transactions WHERE id = ?", (tx_id,))
                                 tx = cur.fetchone()
                                 if not tx or tx["status"] != "pending":
-                                    await answer_callback_query(cb_id, "Уже обработан!", True)
-                                    conn.close(); continue
+                                    await answer_callback_query(cb_id, "Уже обработан!", True); conn.close(); continue
+                                
                                 if action == "accept":
                                     cur.execute("UPDATE transactions SET status = 'completed' WHERE id = ?", (tx_id,))
                                     cur.execute("UPDATE users SET balance_rub = balance_rub + ? WHERE user_id = ?", (tx["amount_rub"], tx["user_id"]))
                                     await answer_callback_query(cb_id, "Чек принят!")
-                                    await send_tg_message(tx["user_id"], f"✅ <b>Чек #{tx_id} подтвержден!</b>\nНачислено: {tx['amount_rub']} ₽")
+                                    await send_tg_message(tx["user_id"], f"✅ <b>Ваш баланс пополнен!</b>\nСумма: {tx['amount_rub']} ₽")
                                 elif action == "reject":
                                     cur.execute("UPDATE transactions SET status = 'rejected' WHERE id = ?", (tx_id,))
                                     await answer_callback_query(cb_id, "Чек отклонен.")
-                                    await send_tg_message(tx["user_id"], f"❌ <b>Чек #{tx_id} отклонен.</b>")
+                                    await send_tg_message(tx["user_id"], f"❌ <b>Ваш чек #{tx_id} отклонен.</b> Попробуйте снова или обратитесь в поддержку.")
                                 conn.commit(); conn.close()
-                                await edit_message_text(chat_id, msg_id, msg.get("text", msg.get("caption", "")), {"inline_keyboard": []})
+                                await edit_message_text(chat_id, msg_id, msg.get("text", msg.get("caption", "")) + f"\n\n<b>Статус:</b> {'Принят' if action == 'accept' else 'Отклонен'}", {"inline_keyboard": []})
 
-                            # Заказы (Покупки)
                             elif cb_data.startswith("order_done_"):
                                 tx_id = int(cb_data.split("_")[2])
                                 conn = get_db()
@@ -206,17 +217,16 @@ async def tg_polling_worker():
                                 if tx and tx["status"] == "pending":
                                     cur.execute("UPDATE transactions SET status = 'completed' WHERE id = ?", (tx_id,))
                                     conn.commit()
-                                    await answer_callback_query(cb_id, "Заказ отмечен как выполненный!")
+                                    await answer_callback_query(cb_id, "Заказ выполнен!")
                                     await send_tg_message(tx["user_id"], f"✅ <b>Ваш заказ #{tx_id} успешно выполнен!</b>")
-                                    await edit_message_text(chat_id, msg_id, msg.get("text", "") + "\n\n✅ <b>ВЫПОЛНЕН</b>", {"inline_keyboard": []})
+                                    await edit_message_text(chat_id, msg_id, msg.get("text", msg.get("caption", "")) + "\n\n✅ <b>ВЫПОЛНЕН</b>", {"inline_keyboard": []})
                                 else:
                                     await answer_callback_query(cb_id, "Заказ уже обработан!", True)
                                 conn.close()
 
                             elif cb_data.startswith("order_reject_"):
-                                await answer_callback_query(cb_id, "Чтобы отклонить заказ, сделайте Reply (Ответить) на это сообщение и напишите причину!", True)
-
-        except Exception as e: print(e)
+                                await answer_callback_query(cb_id, "Чтобы отклонить, сделайте Reply (Ответить) на это сообщение и укажите причину возврата!", True)
+        except Exception: pass
         await asyncio.sleep(2)
 
 async def crypto_polling_worker():
@@ -281,7 +291,7 @@ async def create_crypto(request: Request):
     body = await request.json()
     uid, amount = validate_init_data(body.get("initData", "")).get("id"), float(body.get("amount_rub", 0))
     if amount < 100: raise HTTPException(status_code=400, detail="Мин. сумма 100 ₽")
-    payload = {"amount": str(round(amount * CRYPTO_RATE_MULTIPLIER, 2)), "currency_type": "fiat", "fiat": "RUB", "description": "SwapPay", "payload": str(uid)}
+    payload = {"amount": str(round(amount * CRYPTO_RATE_MULTIPLIER, 2)), "currency_type": "fiat", "fiat": "RUB", "description": "SwapPay"}
     async with httpx.AsyncClient() as client:
         res = (await client.post("https://pay.crypt.bot/api/createInvoice", json=payload, headers={"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN})).json()
     crypto_invoices[res["result"]["invoice_id"]] = {"user_id": uid, "amount_rub": amount}
@@ -290,9 +300,7 @@ async def create_crypto(request: Request):
 @app.post("/api/deposit/pdf-receipt")
 async def upload_receipt(initData: str = Form(...), amount_rub: float = Form(...), currency: str = Form(...), receipt: UploadFile = File(...)):
     uid = validate_init_data(initData).get("id")
-    if not receipt.filename.lower().endswith(".pdf"): raise HTTPException(status_code=400, detail="Только PDF!")
     file_bytes = await receipt.read()
-
     conn = get_db()
     cur = conn.cursor()
     cur.execute("INSERT INTO transactions (user_id, type, amount_rub, currency, status, receipt_filename) VALUES (?, 'deposit', ?, ?, 'pending', ?)", (uid, amount_rub, currency.upper(), receipt.filename))
@@ -302,19 +310,22 @@ async def upload_receipt(initData: str = Form(...), amount_rub: float = Form(...
 
     caption = f"📥 <b>Чек #{tx_id}</b>\nЮзер: <code>{uid}</code>\nСумма: <b>{amount_rub:.2f} ₽</b> ({currency.upper()})"
     markup = {"inline_keyboard": [[{"text": "✅ Подтвердить", "callback_data": f"accept_tx_{tx_id}"}, {"text": "❌ Отклонить", "callback_data": f"reject_tx_{tx_id}"}]]}
-    for d in drops: await send_tg_document(d["user_id"], receipt.filename, file_bytes, caption, markup)
+    for d in drops: await send_tg_document(d["user_id"], receipt.filename, file_bytes, caption, markup, is_photo=False)
+    await send_tg_message(uid, f"⏳ <b>Ваш чек на {amount_rub} ₽ передан на проверку.</b> Ожидайте уведомления!")
     return {"status": "ok"}
 
 @app.post("/api/purchase")
-async def handle_purchase(request: Request):
-    body = await request.json()
-    uid = validate_init_data(body.get("initData", "")).get("id")
-    ptype, amount, details = body.get("type"), float(body.get("amount", 0)), body.get("details", "")
-    
+async def handle_purchase(
+    initData: str = Form(...), 
+    ptype: str = Form(...), 
+    amount: float = Form(...), 
+    details: str = Form(""), 
+    photo: Optional[UploadFile] = File(None)
+):
+    uid = validate_init_data(initData).get("id")
     if amount < 25: raise HTTPException(status_code=400, detail="Минимум 25 ₽")
-    if ptype == "usdt":
-        if not re.match(r'^T[A-Za-z1-9]{33}$', details):
-            raise HTTPException(status_code=400, detail="Неверный формат TRC-20 кошелька")
+    if ptype == "usdt" and not re.match(r'^T[A-Za-z1-9]{33}$', details):
+        raise HTTPException(status_code=400, detail="Неверный формат TRC-20 кошелька")
 
     conn = get_db()
     user = conn.execute("SELECT balance_rub, bonus_balance FROM users WHERE user_id = ?", (uid,)).fetchone()
@@ -326,17 +337,20 @@ async def handle_purchase(request: Request):
     
     cur = conn.cursor()
     cur.execute("UPDATE users SET balance_rub = balance_rub - ?, bonus_balance = bonus_balance - ? WHERE user_id = ?", (rub_use, bonus_use, uid))
-    cur.execute("INSERT INTO transactions (user_id, type, amount_rub, status, details) VALUES (?, ?, ?, 'pending', ?)", (uid, ptype, amount, details))
+    cur.execute("INSERT INTO transactions (user_id, type, amount_rub, bonus_used, status, details) VALUES (?, ?, ?, ?, 'pending', ?)", (uid, ptype, amount, bonus_use, details))
     tx_id = cur.lastrowid
     conn.commit(); conn.close()
 
-    # Отправка заказа админам
     text = f"📦 <b>Новый Заказ #{tx_id}</b>\nЮзер: <code>{uid}</code>\nТип: {ptype.upper()}\nСумма: <b>{amount} ₽</b>\nДетали:\n<code>{details}</code>"
-    markup = {"inline_keyboard": [[
-        {"text": "✅ Выполнен", "callback_data": f"order_done_{tx_id}"}, 
-        {"text": "❌ Отклонить", "callback_data": f"order_reject_{tx_id}"}
-    ]]}
-    await send_tg_message(LOG_CHAT_ID, text, markup)
+    markup = {"inline_keyboard": [[{"text": "✅ Выполнен", "callback_data": f"order_done_{tx_id}"}, {"text": "❌ Отклонить", "callback_data": f"order_reject_{tx_id}"}]]}
+    
+    if photo and photo.filename:
+        file_bytes = await photo.read()
+        await send_tg_document(LOG_CHAT_ID, photo.filename, file_bytes, text, markup, is_photo=True)
+    else:
+        await send_tg_message(LOG_CHAT_ID, text, markup)
+        
+    await send_tg_message(uid, f"⏳ <b>Ваш заказ #{tx_id} на сумму {amount} ₽ принят в обработку!</b>")
     return {"status": "ok"}
 
 @app.post("/api/promo/activate")
@@ -344,15 +358,12 @@ async def activate_promo(request: Request):
     body = await request.json()
     uid = validate_init_data(body.get("initData", "")).get("id")
     code = body.get("code", "").strip().upper()
-    
     conn = get_db()
     promo = conn.execute("SELECT * FROM promocodes WHERE code = ? AND is_active = 1", (code,)).fetchone()
     if not promo or promo["current_uses"] >= promo["max_uses"]:
         conn.close(); raise HTTPException(status_code=400, detail="Промокод не найден или истек")
-        
     used = conn.execute("SELECT 1 FROM used_promocodes WHERE user_id = ? AND promocode_id = ?", (uid, promo["id"])).fetchone()
-    if used:
-        conn.close(); raise HTTPException(status_code=400, detail="Вы уже использовали этот промокод")
+    if used: conn.close(); raise HTTPException(status_code=400, detail="Вы уже использовали этот промокод")
 
     conn.execute("UPDATE promocodes SET current_uses = current_uses + 1 WHERE id = ?", (promo["id"],))
     conn.execute("INSERT INTO used_promocodes (user_id, promocode_id) VALUES (?, ?)", (uid, promo["id"]))
@@ -360,7 +371,6 @@ async def activate_promo(request: Request):
     conn.commit(); conn.close()
     return {"status": "ok", "amount": promo["amount"]}
 
-# --------- РОУТЫ ПОДДЕРЖКИ (ОСТАВЛЕНЫ БЕЗ ИЗМЕНЕНИЙ) ---------
 @app.get("/api/support/messages")
 async def get_messages(initData: str, target_uid: Optional[int] = None):
     uid = validate_init_data(initData).get("id")
@@ -377,7 +387,6 @@ async def send_support(request: Request):
     body = await request.json()
     uid, text, target_uid = validate_init_data(body.get("initData", "")).get("id"), body.get("text", "").strip(), body.get("target_uid")
     if not text: raise HTTPException(status_code=400)
-
     conn = get_db()
     is_admin = conn.execute("SELECT role FROM users WHERE user_id = ?", (uid,)).fetchone()["role"] == "admin"
     if is_admin and target_uid:
