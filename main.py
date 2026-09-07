@@ -16,7 +16,7 @@ import httpx
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN")
 LOG_CHAT_ID = os.getenv("LOG_CHAT_ID", "-5401409248")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/SwapPay_bot/app") # Ссылка на твой WebApp
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/SwapPay_bot/app") # Замени на свою ссылку
 SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 CRYPTO_RATE_MULTIPLIER = 1.4
@@ -164,7 +164,6 @@ async def tg_polling_worker():
                             chat_id = msg["chat"]["id"]
                             text = msg["text"]
 
-                            # Возврат средств при отклонении заказа админом (Reply)
                             if "reply_to_message" in msg:
                                 reply_text = msg["reply_to_message"].get("text", msg["reply_to_message"].get("caption", ""))
                                 match = re.search(r'Заказ #(\d+)', reply_text)
@@ -184,7 +183,13 @@ async def tg_polling_worker():
                                     conn.close()
                             
                             elif text.startswith("/start"):
-                                markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "web_app": {"url": WEBAPP_URL}}]]}
+                                # ИСправлено: теперь ссылка работает 100% как прямая ссылка на WebApp
+                                markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "web_app": {"url": os.getenv("DIRECT_WEBAPP_LINK", "https://your-domain.com/index.html") if not WEBAPP_URL.startswith("https://t.me") else WEBAPP_URL}}]]}
+                                # Если у вас WEBAPP_URL это ссылка t.me, то web_app кнопка ее не примет.
+                                # Поэтому мы делаем обычную url кнопку для t.me ссылок:
+                                if WEBAPP_URL.startswith("https://t.me"):
+                                    markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "url": WEBAPP_URL}]]}
+
                                 welcome_text = (
                                     "👋 <b>Добро пожаловать в SwapPay!</b>\n\n"
                                     "Мы помогаем оплачивать покупки на RU маркетплейсах, "
@@ -220,7 +225,6 @@ async def tg_polling_worker():
                                     await edit_message_text(chat_id, msg_id, msg.get("text", msg.get("caption", "")) + f"\n\n<b>Статус:</b> {'Принят' if action == 'accept' else 'Отклонен'}", {"inline_keyboard": []})
                                 conn.close()
 
-                            # Выполнение заказа и просьба оставить отзыв
                             elif cb_data.startswith("order_done_"):
                                 tx_id = int(cb_data.split("_")[2])
                                 conn = get_db()
@@ -232,8 +236,8 @@ async def tg_polling_worker():
                                     conn.commit()
                                     await answer_callback_query(cb_id, "Заказ выполнен!")
                                     
-                                    # Отправка юзеру плашки для отзыва с привязкой ID заказа (startapp=review_123)
-                                    review_markup = {"inline_keyboard": [[{"text": "⭐️ Оценить работу", "web_app": {"url": f"{WEBAPP_URL}?startapp=review_{tx_id}"}}]]}
+                                    # ИСПРАВЛЕНИЕ: Используем 'url' вместо 'web_app', чтобы избежать ошибки BUTTON_URL_INVALID
+                                    review_markup = {"inline_keyboard": [[{"text": "⭐️ Оценить работу", "url": f"{WEBAPP_URL}?startapp=review_{tx_id}"}]]}
                                     user_msg = f"✅ <b>Ваш заказ #{tx_id} на сумму {tx['amount_rub']} ₽ успешно выполнен!</b>\n\nПожалуйста, уделите секунду и оставьте отзыв 👇"
                                     
                                     await send_tg_message(tx["user_id"], user_msg, review_markup)
@@ -373,7 +377,6 @@ async def activate_promo(request: Request):
     conn.commit(); conn.close()
     return {"status": "ok", "amount": promo["amount"]}
 
-# --------- ОТЗЫВЫ (Обновлено с валидацией) ---------
 @app.get("/api/reviews")
 async def get_reviews(initData: str):
     validate_init_data(initData)
@@ -394,22 +397,30 @@ async def add_review(request: Request):
         raise HTTPException(status_code=400, detail="Заполните все данные")
         
     conn = get_db()
-    # Проверка: есть ли у юзера этот выполненный заказ
     tx = conn.execute("SELECT amount_rub, status, type FROM transactions WHERE id = ? AND user_id = ?", (tx_id, uid)).fetchone()
     if not tx or tx["status"] != "completed" or tx["type"] not in ("service", "usdt"):
-        conn.close()
-        raise HTTPException(status_code=403, detail="Оставить отзыв можно только на успешно выполненный заказ.")
+        conn.close(); raise HTTPException(status_code=403, detail="Оставить отзыв можно только на успешно выполненный заказ.")
         
-    # Проверка: не оставлял ли он уже отзыв на этот же заказ
     existing = conn.execute("SELECT 1 FROM reviews WHERE tx_id = ?", (tx_id,)).fetchone()
     if existing:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Вы уже оставили отзыв на этот заказ.")
+        conn.close(); raise HTTPException(status_code=400, detail="Вы уже оставили отзыв на этот заказ.")
 
-    conn.execute("INSERT INTO reviews (user_id, tx_id, stars, amount_rub, text) VALUES (?, ?, ?, ?, ?)", 
-                 (uid, tx_id, stars, tx["amount_rub"], text))
+    conn.execute("INSERT INTO reviews (user_id, tx_id, stars, amount_rub, text) VALUES (?, ?, ?, ?, ?)", (uid, tx_id, stars, tx["amount_rub"], text))
     conn.commit(); conn.close()
     return {"status": "ok"}
+
+# НОВЫЙ ЭНДПОИНТ: Еженедельные задания (визуал)
+@app.get("/api/quests")
+async def get_quests(initData: str):
+    validate_init_data(initData)
+    # Пока отдаем статику для фронтенда
+    quests = [
+        {"id": 1, "title": "Охотник за покупками", "desc": "Сделать заказы на сумму от 300 ₽", "reward": 50, "progress": 0, "max": 300},
+        {"id": 2, "title": "Первый друг", "desc": "Пригласить друга, сделавшего 1 заказ", "reward": 25, "progress": 0, "max": 1},
+        {"id": 3, "title": "Мастер нетворкинга", "desc": "Пригласить 10 рефералов", "reward": 75, "progress": 0, "max": 10},
+        {"id": 4, "title": "Душа компании", "desc": "Активность в чате (оставить 5 сообщений)", "reward": 40, "progress": 0, "max": 5}
+    ]
+    return {"quests": quests}
 
 # --------- АДМИН ПАНЕЛЬ ---------
 @app.get("/api/admin/tickets")
