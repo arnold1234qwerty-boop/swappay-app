@@ -1,162 +1,236 @@
+import os
+import asyncio
 import sqlite3
 import hmac
 import hashlib
 import json
-from fastapi.staticfiles import StaticFiles # type: ignore
-from fastapi.responses import FileResponse # type: ignore
 from urllib.parse import parse_qsl
-from fastapi import FastAPI, HTTPException, Request, Depends # type: ignore
-from fastapi.middleware.cors import CORSMiddleware # type: ignore
-from pydantic import BaseModel
-import time
-from importlib import import_module
+from contextlib import asynccontextmanager
+from typing import Optional
 
-BOT_TOKEN = "8695905699:AAGuQ_PWRFPcBmnWBO6FsTmj3_FIygaRwww" # Укажите токен вашего бота
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+import httpx
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8695905699:AAH2i5C825HkRrS3bkgAMp-UOE-PxV4tB04")
+CRYPTOBOT_TOKEN = "631597:AAKH5PkslQyUSTvJPyZTmtEaC0bMyo117NB"
+LOG_CHAT_ID = "-5401409248"
+SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 
-app = FastAPI(title="SwapPay WebApp API")
-# Настройка отдачи статических файлов (JS, CSS)
-app.mount("/assets", StaticFiles(directory="."), name="assets")
+CRYPTO_RATE_MULTIPLIER = 1.4  # Комиссия 40%
 
-# Главная страница Web App
+# Хранилище счетов в памяти {invoice_id: {"user_id": int, "amount_rub": float}}
+crypto_invoices = {}
+
+# --- БАЗА ДАННЫХ ---
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY,
+        role TEXT DEFAULT 'user',
+        drop_role TEXT DEFAULT 'not',
+        balance_rub REAL DEFAULT 0.0,
+        bonus_balance REAL DEFAULT 0.0,
+        referrer_id INTEGER DEFAULT NULL
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        type TEXT,
+        amount_rub REAL,
+        currency TEXT,
+        status TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    # Назначение абсолютных прав администратору
+    cursor.execute("""
+    INSERT INTO users (user_id, role, drop_role, balance_rub, bonus_balance)
+    VALUES (?, 'admin', 'all', 0.0, 0.0)
+    ON CONFLICT(user_id) DO UPDATE SET role = 'admin', drop_role = 'all'
+    """, (SUPER_ADMIN_ID,))
+    conn.commit()
+    conn.close()
+
+# --- ЛОГИРОВАНИЕ В ТЕЛЕГРАМ-КОНФУ ---
+async def send_log(text: str):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": LOG_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML"
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(url, json=payload)
+    except Exception as e:
+        print(f"[Log Error] {e}")
+
+# --- ФОНОВЫЙ WORKER ДЛЯ КРИПТОБОТА ---
+async def crypto_polling_worker():
+    while True:
+        try:
+            if crypto_invoices:
+                invoice_ids = list(crypto_invoices.keys())
+                ids_param = ",".join(map(str, invoice_ids))
+                url = f"https://pay.crypt.bot/api/getInvoices?invoice_ids={ids_param}"
+                headers = {"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN}
+
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("ok"):
+                            for item in data.get("result", {}).get("items", []):
+                                inv_id = item["invoice_id"]
+                                if item["status"] == "paid" and inv_id in crypto_invoices:
+                                    inv_data = crypto_invoices.pop(inv_id)
+                                    uid = inv_data["user_id"]
+                                    amt = inv_data["amount_rub"]
+
+                                    # Начисляем баланс в SQLite
+                                    conn = sqlite3.connect(DB_PATH)
+                                    cur = conn.cursor()
+                                    cur.execute("UPDATE users SET balance_rub = balance_rub + ? WHERE user_id = ?", (amt, uid))
+                                    cur.execute("""
+                                    INSERT INTO transactions (user_id, type, amount_rub, currency, status)
+                                    VALUES (?, 'deposit', ?, 'CRYPTO', 'completed')
+                                    """, (uid, amt))
+                                    conn.commit()
+                                    conn.close()
+
+                                    # Уведомление юзера в ЛС
+                                    notify_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                                    await client.post(notify_url, json={
+                                        "chat_id": uid,
+                                        "text": f"✅ <b>Баланс пополнен!</b>\nНачислено: <code>{amt:.2f} ₽</code> через CryptoBot."
+                                    })
+
+                                    # Лог в конфу
+                                    await send_log(
+                                        f"💎 <b>Успешное пополнение CryptoBot</b>\n"
+                                        f"Пользователь: <code>{uid}</code>\n"
+                                        f"Зачислено на баланс: <b>{amt:.2f} ₽</b>\n"
+                                        f"ID инвойса: <code>{inv_id}</code>"
+                                    )
+        except Exception as err:
+            print(f"[Crypto Worker Error] {err}")
+
+        await asyncio.sleep(5)
+
+# --- ЖИЗНЕННЫЙ ЦИКЛ FASTAPI ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    worker_task = asyncio.create_task(crypto_polling_worker())
+    yield
+    worker_task.cancel()
+
+app = FastAPI(lifespan=lifespan)
+
+# --- ВАЛИДАЦИЯ INITDATA ---
+def validate_telegram_data(init_data: str) -> dict:
+    if not init_data:
+        raise HTTPException(status_code=401, detail="Отсутствуют данные авторизации")
+    
+    vals = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = vals.pop("hash", None)
+    if not received_hash:
+        raise HTTPException(status_code=401, detail="Отсутствует цифровая подпись")
+
+    check_str = "\n".join(f"{k}={v}" for k, v in sorted(vals.items()))
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    expected_hash = hmac.new(secret_key, check_str.encode(), hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(expected_hash, received_hash):
+        raise HTTPException(status_code=403, detail="Неверная цифровая подпись")
+
+    return json.loads(vals.get("user", "{}"))
+
+# --- РОУТЫ СТАТИКИ ---
 @app.get("/")
 def serve_html():
     return FileResponse("index.html")
-    
+
 @app.get("/app.js")
 def serve_js():
     return FileResponse("app.js")
 
-# Настройка CORS для работы с WebApp
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# --- API ---
+@app.post("/api/auth")
+async def auth_user(request: Request):
+    body = await request.json()
+    tg_user = validate_telegram_data(body.get("initData", ""))
+    uid = tg_user.get("id")
 
-# Простейший In-Memory Rate Limiter (Анти-флуд)
-RATE_LIMIT_DATA = {}
-def rate_limit(request: Request):
-    client_ip = request.client.host
-    current_time = time.time()
-    if client_ip in RATE_LIMIT_DATA:
-        last_time, count = RATE_LIMIT_DATA[client_ip]
-        if current_time - last_time < 1: # 1 секунда окно
-            if count > 5: # Макс 5 запросов в секунду
-                raise HTTPException(status_code=429, detail="Too Many Requests")
-            RATE_LIMIT_DATA[client_ip] = (last_time, count + 1)
-        else:
-            RATE_LIMIT_DATA[client_ip] = (current_time, 1)
-    else:
-        RATE_LIMIT_DATA[client_ip] = (current_time, 1)
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-def validate_init_data(init_data: str) -> dict:
-    """Валидация данных от Telegram WebApp."""
-    try:
-        parsed_data = dict(parse_qsl(init_data))
-        if 'hash' not in parsed_data:
-            raise ValueError("Hash is missing")
-        
-        received_hash = parsed_data.pop('hash')
-        data_check_string = "\n".join([f"{k}={v}" for k, v in sorted(parsed_data.items())])
-        
-        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-        calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-        
-        if calculated_hash != received_hash:
-            raise ValueError("Invalid hash")
-            
-        user_data = json.loads(parsed_data.get('user', '{}'))
-        return user_data
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-class AuthRequest(BaseModel):
-    initData: str
-
-@app.post("/api/auth", dependencies=[Depends(rate_limit)])
-def authenticate_user(req: AuthRequest, db: sqlite3.Connection = Depends(get_db)):
-    user_data = validate_init_data(req.initData)
-    user_id = user_data.get('id')
-    
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-    
-    if not user:
-        # Регистрация нового пользователя
-        cursor.execute("""
-            INSERT INTO users (user_id, username, first_name, last_name, balance_rub, bonus_balance, role, drop) 
-            VALUES (?, ?, ?, ?, 0, 0, 'user', 'not')
-        """, (user_id, user_data.get('username'), user_data.get('first_name'), user_data.get('last_name')))
-        db.commit()
-        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-        user = cursor.fetchone()
-
-    return dict(user)
-
-@app.get("/api/drop/transactions", dependencies=[Depends(rate_limit)])
-def get_drop_transactions(initData: str, db: sqlite3.Connection = Depends(get_db)):
-    user_data = validate_init_data(initData)
-    
-    cursor = db.cursor()
-    cursor.execute("SELECT role, drop FROM users WHERE user_id = ?", (user_data['id'],))
-    user = cursor.fetchone()
-    
-    if not user or (user['drop'] == 'not' and user['role'] != 'admin'):
-        raise HTTPException(status_code=403, detail="Access denied")
-        
-    query = "SELECT * FROM transactions WHERE status = 'pending'"
-    params = []
-    
-    if user['drop'] != 'all' and user['role'] != 'admin':
-        query += " AND currency = ?"
-        params.append(user['drop'].upper())
-        
-    cursor.execute(query, params)
-    return [dict(row) for row in cursor.fetchall()]
-
-if __name__ == "__main__":
-    # Инициализация структуры БД
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY, 
-            username TEXT, 
-            first_name TEXT, 
-            last_name TEXT, 
-            balance_rub REAL DEFAULT 0, 
-            bonus_balance REAL DEFAULT 0, 
-            referrer_id INTEGER, 
-            role TEXT DEFAULT 'user', 
-            [drop] TEXT DEFAULT 'not', 
-            is_subscribed INTEGER DEFAULT 0, 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
-            last_activity TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            user_id INTEGER, 
-            type TEXT, 
-            amount_rub REAL, 
-            currency TEXT, 
-            amount_original REAL, 
-            status TEXT, 
-            payment_method TEXT, 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    cur = conn.cursor()
+    cur.execute("SELECT user_id, role, drop_role, balance_rub, bonus_balance FROM users WHERE user_id = ?", (uid,))
+    row = cur.fetchone()
+
+    if not row:
+        role = "admin" if uid == SUPER_ADMIN_ID else "user"
+        drop_role = "all" if uid == SUPER_ADMIN_ID else "not"
+        cur.execute("INSERT INTO users (user_id, role, drop_role) VALUES (?, ?, ?)", (uid, role, drop_role))
+        conn.commit()
+        user_info = {"user_id": uid, "role": role, "drop": drop_role, "balance_rub": 0.0, "bonus_balance": 0.0}
+    else:
+        user_info = {"user_id": row[0], "role": row[1], "drop": row[2], "balance_rub": row[3], "bonus_balance": row[4]}
+
     conn.close()
-    import_module("uvicorn").run(app, host="0.0.0.0", port=7174)
+    return user_info
+
+@app.post("/api/deposit/crypto")
+async def create_crypto_invoice(request: Request):
+    body = await request.json()
+    tg_user = validate_telegram_data(body.get("initData", ""))
+    uid = tg_user.get("id")
+    
+    amount_rub = float(body.get("amount_rub", 0))
+    if amount_rub < 100:
+        raise HTTPException(status_code=400, detail="Минимальная сумма пополнения — 100 ₽")
+
+    total_crypto_rub = round(amount_rub * CRYPTO_RATE_MULTIPLIER, 2)
+
+    url = "https://pay.crypt.bot/api/createInvoice"
+    headers = {"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN}
+    payload = {
+        "amount": str(total_crypto_rub),
+        "currency_type": "fiat",
+        "fiat": "RUB",
+        "description": f"Пополнение SwapPay на {amount_rub} ₽ (+40% наценка)",
+        "payload": str(uid)
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+        res_data = resp.json()
+
+    if not res_data.get("ok"):
+        raise HTTPException(status_code=500, detail="Ошибка создания счета в CryptoBot")
+
+    invoice = res_data["result"]
+    inv_id = invoice["invoice_id"]
+    pay_url = invoice["pay_url"]
+
+    # Фиксируем инвойс для воркера
+    crypto_invoices[inv_id] = {
+        "user_id": uid,
+        "amount_rub": amount_rub
+    }
+
+    # Логируем попытку создания инвойса в конфу
+    await send_log(
+        f"📝 <b>Создан счет CryptoBot</b>\n"
+        f"Пользователь: <code>{uid}</code>\n"
+        f"К зачислению: <b>{amount_rub:.2f} ₽</b>\n"
+        f"К оплате юзером: <b>{total_crypto_rub:.2f} ₽</b>\n"
+        f"Invoice ID: <code>{inv_id}</code>"
+    )
+
+    return {"pay_url": pay_url, "invoice_id": inv_id}
