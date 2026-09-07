@@ -4,6 +4,7 @@ import sqlite3
 import hmac
 import hashlib
 import json
+import re
 from urllib.parse import parse_qsl
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -19,7 +20,7 @@ SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 
 CRYPTO_RATE_MULTIPLIER = 1.4
-MIN_DEPOSIT = 100.0
+USDT_RATE = 95.0
 
 crypto_invoices = {}
 
@@ -41,6 +42,7 @@ def init_db():
         balance_rub REAL DEFAULT 0.0,
         bonus_balance REAL DEFAULT 0.0,
         referrer_id INTEGER DEFAULT NULL,
+        support_status TEXT DEFAULT 'closed',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -90,29 +92,24 @@ def init_db():
     conn.commit()
     conn.close()
 
-async def send_tg_message(chat_id, text: str):
+async def send_tg_message(chat_id, text: str, reply_markup=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
-    except Exception as e:
+            await client.post(url, json=payload)
+    except Exception:
         pass
 
-async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: str):
+async def send_tg_document(chat_id, filename: str, file_bytes: bytes, caption: str, reply_markup=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
     try:
         files = {"document": (filename, file_bytes, "application/pdf")}
         data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            await client.post(url, data=data, files=files)
-    except Exception:
-        pass
-
-async def send_tg_photo(chat_id, filename: str, file_bytes: bytes, caption: str):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-    try:
-        files = {"photo": (filename, file_bytes, "image/jpeg")}
-        data = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
+        if reply_markup:
+            data["reply_markup"] = json.dumps(reply_markup)
         async with httpx.AsyncClient(timeout=20.0) as client:
             await client.post(url, data=data, files=files)
     except Exception:
@@ -121,17 +118,90 @@ async def send_tg_photo(chat_id, filename: str, file_bytes: bytes, caption: str)
 async def send_log(text: str):
     await send_tg_message(LOG_CHAT_ID, text)
 
+async def answer_callback_query(callback_query_id: str, text: str, show_alert: bool = False):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery"
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(url, json={"callback_query_id": callback_query_id, "text": text, "show_alert": show_alert})
+    except Exception:
+        pass
+
+async def tg_polling_worker():
+    """Фоновый воркер для обработки инлайн-кнопок из Telegram"""
+    offset = 0
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={offset}&timeout=5"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for update in data.get("result", []):
+                        offset = update["update_id"] + 1
+                        if "callback_query" in update:
+                            cb = update["callback_query"]
+                            cb_id = cb["id"]
+                            cb_data = cb.get("data", "")
+                            msg = cb.get("message", {})
+                            chat_id = msg.get("chat", {}).get("id")
+                            msg_id = msg.get("message_id")
+
+                            if cb_data.startswith("accept_tx_") or cb_data.startswith("reject_tx_"):
+                                tx_id = int(cb_data.split("_")[2])
+                                action = cb_data.split("_")[0]
+                                
+                                conn = get_db()
+                                cur = conn.cursor()
+                                cur.execute("SELECT status, user_id, amount_rub, currency FROM transactions WHERE id = ?", (tx_id,))
+                                tx = cur.fetchone()
+                                
+                                if not tx:
+                                    await answer_callback_query(cb_id, "Транзакция не найдена", True)
+                                    conn.close()
+                                    continue
+                                
+                                if tx["status"] != "pending":
+                                    await answer_callback_query(cb_id, "Этот чек уже обработан другим администратором!", True)
+                                    conn.close()
+                                    continue
+
+                                if action == "accept":
+                                    cur.execute("UPDATE transactions SET status = 'completed' WHERE id = ?", (tx_id,))
+                                    cur.execute("UPDATE users SET balance_rub = balance_rub + ? WHERE user_id = ?", (tx["amount_rub"], tx["user_id"]))
+                                    conn.commit()
+                                    await answer_callback_query(cb_id, "Чек принят! Баланс зачислен.")
+                                    await send_tg_message(tx["user_id"], f"✅ <b>Ваш чек #{tx_id} подтвержден!</b>\nНачислено: <code>{tx['amount_rub']} ₽</code>")
+                                    await send_log(f"✅ Чек #{tx_id} ({tx['amount_rub']} ₽) принят админом.")
+                                    
+                                    # Убираем кнопки
+                                    try:
+                                        await client.post(f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageReplyMarkup", json={"chat_id": chat_id, "message_id": msg_id, "reply_markup": {"inline_keyboard": []}})
+                                    except: pass
+
+                                elif action == "reject":
+                                    cur.execute("UPDATE transactions SET status = 'rejected' WHERE id = ?", (tx_id,))
+                                    conn.commit()
+                                    await answer_callback_query(cb_id, "Чек отклонен.")
+                                    await send_tg_message(tx["user_id"], f"❌ <b>Ваш чек #{tx_id} был отклонен.</b>\nПожалуйста, обратитесь в поддержку, если считаете это ошибкой.")
+                                    await send_log(f"❌ Чек #{tx_id} ({tx['amount_rub']} ₽) отклонен админом.")
+                                    try:
+                                        await client.post(f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageReplyMarkup", json={"chat_id": chat_id, "message_id": msg_id, "reply_markup": {"inline_keyboard": []}})
+                                    except: pass
+                                
+                                conn.close()
+        except Exception:
+            pass
+        await asyncio.sleep(2)
+
 async def crypto_polling_worker():
     while True:
         try:
             if crypto_invoices:
                 invoice_ids = list(crypto_invoices.keys())
                 ids_param = ",".join(map(str, invoice_ids))
-                url = f"https://pay.crypt.bot/api/getInvoices?invoice_ids={ids_param}"
                 headers = {"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN}
-
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    resp = await client.get(url, headers=headers)
+                    resp = await client.get(f"https://pay.crypt.bot/api/getInvoices?invoice_ids={ids_param}", headers=headers)
                     if resp.status_code == 200:
                         data = resp.json()
                         if data.get("ok"):
@@ -158,21 +228,21 @@ async def crypto_polling_worker():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    worker = asyncio.create_task(crypto_polling_worker())
+    w1 = asyncio.create_task(crypto_polling_worker())
+    w2 = asyncio.create_task(tg_polling_worker())
     yield
-    worker.cancel()
+    w1.cancel()
+    w2.cancel()
 
 app = FastAPI(lifespan=lifespan)
 
 def validate_init_data(init_data: str) -> dict:
-    if not init_data:
-        raise HTTPException(status_code=401, detail="Нет данных")
+    if not init_data: raise HTTPException(status_code=401, detail="Нет данных")
     vals = dict(parse_qsl(init_data, keep_blank_values=True))
     received_hash = vals.pop("hash", None)
     check_str = "\n".join(f"{k}={v}" for k, v in sorted(vals.items()))
     secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    expected_hash = hmac.new(secret_key, check_str.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected_hash, received_hash):
+    if not hmac.compare_digest(hmac.new(secret_key, check_str.encode(), hashlib.sha256).hexdigest(), received_hash):
         raise HTTPException(status_code=403, detail="Ошибка подписи")
     return json.loads(vals.get("user", "{}"))
 
@@ -184,57 +254,41 @@ def serve_app_js(): return FileResponse("app.js")
 @app.post("/api/auth")
 async def api_auth(request: Request):
     body = await request.json()
-    user_info = validate_init_data(body.get("initData", ""))
-    uid = user_info.get("id")
-    uname = user_info.get("username", "")
-    fname = user_info.get("first_name", "")
-
+    uid = validate_init_data(body.get("initData", "")).get("id")
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE user_id = ?", (uid,))
     row = cur.fetchone()
-
     if not row:
-        role = "admin" if uid == SUPER_ADMIN_ID else "user"
-        drop_role = "all" if uid == SUPER_ADMIN_ID else "not"
-        cur.execute("INSERT INTO users (user_id, username, first_name, role, drop_role) VALUES (?, ?, ?, ?, ?)", (uid, uname, fname, role, drop_role))
+        cur.execute("INSERT INTO users (user_id, role) VALUES (?, 'user')", (uid,))
         conn.commit()
-        data = {"user_id": uid, "username": uname, "first_name": fname, "role": role, "drop": drop_role, "balance_rub": 0.0, "bonus_balance": 0.0}
-    else:
-        cur.execute("UPDATE users SET username = ?, first_name = ? WHERE user_id = ?", (uname, fname, uid))
-        conn.commit()
-        data = {"user_id": uid, "username": uname, "first_name": fname, "role": row["role"], "drop": row["drop_role"], "balance_rub": row["balance_rub"], "bonus_balance": row["bonus_balance"]}
+        cur.execute("SELECT * FROM users WHERE user_id = ?", (uid,))
+        row = cur.fetchone()
     conn.close()
-    return data
+    return dict(row)
 
 @app.post("/api/deposit/crypto")
 async def create_crypto(request: Request):
     body = await request.json()
     uid = validate_init_data(body.get("initData", "")).get("id")
     amount = float(body.get("amount_rub", 0))
-
-    if amount < MIN_DEPOSIT:
-        raise HTTPException(status_code=400, detail=f"Мин. сумма {MIN_DEPOSIT} ₽")
+    if amount < 100: raise HTTPException(status_code=400, detail="Мин. сумма 100 ₽")
 
     total_with_fee = round(amount * CRYPTO_RATE_MULTIPLIER, 2)
-    payload = {"amount": str(total_with_fee), "currency_type": "fiat", "fiat": "RUB", "description": f"SwapPay: {amount} ₽", "payload": str(uid)}
-    
+    payload = {"amount": str(total_with_fee), "currency_type": "fiat", "fiat": "RUB", "description": f"SwapPay", "payload": str(uid)}
     async with httpx.AsyncClient() as client:
         resp = await client.post("https://pay.crypt.bot/api/createInvoice", json=payload, headers={"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN})
         res_data = resp.json()
-
     if not res_data.get("ok"): raise HTTPException(status_code=500, detail="Ошибка CryptoBot")
-    inv = res_data["result"]
-    crypto_invoices[inv["invoice_id"]] = {"user_id": uid, "amount_rub": amount}
-    return {"pay_url": inv["pay_url"]}
+    crypto_invoices[res_data["result"]["invoice_id"]] = {"user_id": uid, "amount_rub": amount}
+    return {"pay_url": res_data["result"]["pay_url"]}
 
 @app.post("/api/deposit/pdf-receipt")
 async def upload_receipt(initData: str = Form(...), amount_rub: float = Form(...), currency: str = Form(...), receipt: UploadFile = File(...)):
     uid = validate_init_data(initData).get("id")
-    if not receipt.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Только PDF!")
-
+    if not receipt.filename.lower().endswith(".pdf"): raise HTTPException(status_code=400, detail="Только PDF!")
     file_bytes = await receipt.read()
+    
     conn = get_db()
     cur = conn.cursor()
     cur.execute("INSERT INTO transactions (user_id, type, amount_rub, currency, status, receipt_filename) VALUES (?, 'deposit', ?, ?, 'pending', ?)", (uid, amount_rub, currency.upper(), receipt.filename))
@@ -245,114 +299,73 @@ async def upload_receipt(initData: str = Form(...), amount_rub: float = Form(...
     conn.close()
 
     caption = f"📥 <b>Чек #{tx_id}</b>\nЮзер: <code>{uid}</code>\nСумма: <b>{amount_rub:.2f} ₽</b> ({currency.upper()})"
+    markup = {"inline_keyboard": [[{"text": "✅ Подтвердить", "callback_data": f"accept_tx_{tx_id}"}, {"text": "❌ Отклонить", "callback_data": f"reject_tx_{tx_id}"}]]}
+    
     for d in drops:
-        await send_tg_document(d["user_id"], receipt.filename, file_bytes, caption)
-    await send_log(f"📄 <b>Чек #{tx_id}</b> загружен от <code>{uid}</code>")
+        await send_tg_document(d["user_id"], receipt.filename, file_bytes, caption, markup)
+    await send_log(f"📄 <b>Чек #{tx_id}</b> загружен.")
     return {"status": "ok"}
 
 @app.post("/api/purchase")
-async def purchase_item(initData: str = Form(...), amount: float = Form(...), details: str = Form(...), photo: Optional[UploadFile] = File(None)):
-    uid = validate_init_data(initData).get("id")
+async def handle_purchase(request: Request):
+    body = await request.json()
+    uid = validate_init_data(body.get("initData", "")).get("id")
+    ptype = body.get("type")
+    amount = float(body.get("amount", 0))
+    details = body.get("details", "")
+
     if amount < 25: raise HTTPException(status_code=400, detail="Минимум 25 ₽")
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT balance_rub FROM users WHERE user_id = ?", (uid,))
-    bal = cur.fetchone()["balance_rub"]
-    if bal < amount:
+    cur.execute("SELECT balance_rub, bonus_balance FROM users WHERE user_id = ?", (uid,))
+    user = cur.fetchone()
+
+    total_funds = user["balance_rub"] + user["bonus_balance"]
+    if total_funds < amount:
         conn.close()
         raise HTTPException(status_code=400, detail="Недостаточно средств")
 
-    cur.execute("UPDATE users SET balance_rub = balance_rub - ? WHERE user_id = ?", (amount, uid))
+    # Идемпотентное списание: сначала бонусы, потом рубли
+    bonus_to_use = min(amount, user["bonus_balance"])
+    rub_to_use = amount - bonus_to_use
+
+    if ptype == "usdt":
+        if not re.match(r'^T[A-Za-z1-9]{33}$', details):
+            conn.close()
+            raise HTTPException(status_code=400, detail="Неверный формат TRC-20 кошелька")
+        usdt_amt = round(amount / USDT_RATE, 2)
+        desc = f"Вывод {usdt_amt} USDT на {details}"
+    else:
+        desc = f"Оплата услуги: {details}"
+
+    cur.execute("UPDATE users SET balance_rub = balance_rub - ?, bonus_balance = bonus_balance - ? WHERE user_id = ?", (rub_to_use, bonus_to_use, uid))
     cur.execute("INSERT INTO transactions (user_id, type, amount_rub, status) VALUES (?, 'purchase', ?, 'pending')", (uid, amount))
     tx_id = cur.lastrowid
     conn.commit()
     conn.close()
 
-    cap = f"🛍 <b>Новая заявка на оплату #{tx_id}</b>\nОт: <code>{uid}</code>\nСумма списания: <b>{amount} ₽</b>\nДетали: {details}"
-    if photo:
-        p_bytes = await photo.read()
-        await send_tg_photo(LOG_CHAT_ID, photo.filename, p_bytes, cap)
-    else:
-        await send_log(cap)
+    await send_log(f"🛍 <b>Новый заказ #{tx_id}</b>\nОт: <code>{uid}</code>\nСумма: <b>{amount} ₽</b>\nДетали: {desc}")
     return {"status": "ok"}
 
-@app.post("/api/promo/activate")
-async def activate_promo(request: Request):
-    body = await request.json()
-    uid = validate_init_data(body.get("initData", "")).get("id")
-    code = body.get("code", "").upper().strip()
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM promocodes WHERE code = ? AND is_active = 1", (code,))
-    promo = cur.fetchone()
-    if not promo:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Промокод не найден или неактивен")
-
-    if promo["current_uses"] >= promo["max_uses"]:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Лимит активаций исчерпан")
-
-    cur.execute("SELECT 1 FROM used_promocodes WHERE user_id = ? AND promocode_id = ?", (uid, promo["id"]))
-    if cur.fetchone():
-        conn.close()
-        raise HTTPException(status_code=400, detail="Вы уже использовали этот промокод")
-
-    cur.execute("INSERT INTO used_promocodes (user_id, promocode_id) VALUES (?, ?)", (uid, promo["id"]))
-    cur.execute("UPDATE promocodes SET current_uses = current_uses + 1 WHERE id = ?", (promo["id"],))
-    cur.execute("UPDATE users SET bonus_balance = bonus_balance + ? WHERE user_id = ?", (promo["amount"], uid))
-    conn.commit()
-    conn.close()
-    return {"status": "ok", "amount": promo["amount"]}
-
-@app.get("/api/referral/stats")
-async def ref_stats(initData: str):
-    uid = validate_init_data(initData).get("id")
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) as cnt FROM users WHERE referrer_id = ?", (uid,))
-    refs = cur.fetchone()["cnt"]
-    conn.close()
-    return {"referrals": refs, "link": f"https://t.me/ТВОЙ_БОТ?start=ref_{uid}"}
-
-@app.get("/api/support/chats")
-async def get_support_chats(initData: str):
-    uid = validate_init_data(initData).get("id")
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT role FROM users WHERE user_id = ?", (uid,))
-    if cur.fetchone()["role"] != "admin": raise HTTPException(status_code=403)
-    
-    cur.execute("""
-    SELECT DISTINCT sm.user_id, u.first_name, u.username 
-    FROM support_messages sm 
-    JOIN users u ON sm.user_id = u.user_id
-    """)
-    chats = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return chats
-
+# --- ПОДДЕРЖКА ---
 @app.get("/api/support/messages")
 async def get_messages(initData: str, target_uid: Optional[int] = None):
     uid = validate_init_data(initData).get("id")
     conn = get_db()
     cur = conn.cursor()
+    cur.execute("SELECT role, support_status FROM users WHERE user_id = ?", (uid,))
+    u = cur.fetchone()
+    is_admin = u["role"] == "admin"
     
-    cur.execute("SELECT role FROM users WHERE user_id = ?", (uid,))
-    is_admin = cur.fetchone()["role"] == "admin"
     chat_uid = target_uid if (is_admin and target_uid) else uid
-
-    cur.execute("""
-    SELECT sm.sender, sm.text, sm.created_at, u.first_name 
-    FROM support_messages sm 
-    JOIN users u ON sm.user_id = u.user_id 
-    WHERE sm.user_id = ? ORDER BY sm.id ASC
-    """, (chat_uid,))
+    cur.execute("SELECT sender, text, created_at FROM support_messages WHERE user_id = ? ORDER BY id ASC", (chat_uid,))
     rows = [dict(r) for r in cur.fetchall()]
+    
+    cur.execute("SELECT support_status FROM users WHERE user_id = ?", (chat_uid,))
+    status = cur.fetchone()["support_status"]
     conn.close()
-    return rows
+    return {"messages": rows, "status": status}
 
 @app.post("/api/support/send")
 async def send_support(request: Request):
@@ -370,27 +383,34 @@ async def send_support(request: Request):
 
     if is_admin and target_uid:
         cur.execute("INSERT INTO support_messages (user_id, sender, text) VALUES (?, 'admin', ?)", (target_uid, text))
-        await send_tg_message(target_uid, f"👨‍💻 <b>Ответ поддержки:</b>\n\n{text}")
+        await send_tg_message(target_uid, f"👨‍💻 <b>Поддержка:</b>\n{text}")
     else:
+        cur.execute("UPDATE users SET support_status = 'active' WHERE user_id = ?", (uid,))
         cur.execute("INSERT INTO support_messages (user_id, sender, text) VALUES (?, 'user', ?)", (uid, text))
-        await send_log(f"🆘 <b>Саппорт:</b> {uid}\n«{text}»")
+        await send_log(f"🆘 <b>Саппорт от {uid}:</b>\n{text}")
     
     conn.commit()
     conn.close()
     return {"status": "ok"}
 
-@app.get("/api/admin/stats")
-async def admin_stats(initData: str):
-    uid = validate_init_data(initData).get("id")
+@app.post("/api/support/close")
+async def close_support(request: Request):
+    body = await request.json()
+    uid = validate_init_data(body.get("initData", "")).get("id")
+    target_uid = body.get("target_uid")
+    action = body.get("action") # 'dm' or 'resolved'
+
     conn = get_db()
     cur = conn.cursor()
     if cur.execute("SELECT role FROM users WHERE user_id = ?", (uid,)).fetchone()["role"] != "admin": raise HTTPException(status_code=403)
     
-    cur.execute("SELECT COUNT(*) as c FROM users")
-    users = cur.fetchone()["c"]
-    cur.execute("SELECT COUNT(*) as c FROM transactions")
-    txs = cur.fetchone()["c"]
-    cur.execute("SELECT COALESCE(SUM(amount_rub), 0) as t FROM transactions WHERE status = 'completed' AND type = 'deposit'")
-    trn = cur.fetchone()["t"]
+    cur.execute("UPDATE users SET support_status = 'closed' WHERE user_id = ?", (target_uid,))
+    conn.commit()
     conn.close()
-    return {"total_users": users, "total_tx": txs, "turnover": trn}
+
+    if action == "resolved":
+        await send_tg_message(target_uid, "✅ Ваше обращение в поддержку было закрыто как решенное. Спасибо, что используете SwapPay!")
+    else:
+        await send_tg_message(target_uid, "Оператор закрыл чат и переведет общение в личные сообщения.")
+    
+    return {"status": "ok"}
