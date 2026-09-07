@@ -1,14 +1,16 @@
 const tg = window.Telegram?.WebApp;
-if (tg) {
-    tg.expand();
-    tg.ready();
-}
+if (tg) { tg.expand(); tg.ready(); }
 
-let user = { role: "user", balance_rub: 0, bonus_balance: 0 };
-let currentMethod = "crypto";
-let selectedFile = null;
+let user = { id: 0, name: "User", role: "user" };
+let depMethod = 'crypto';
+let activeAdminChatUser = null;
 
-async function init() {
+// Инициализация при старте (исправляет баг обновления страницы)
+async function initApp() {
+    const savedTheme = localStorage.getItem("theme") || "basic";
+    document.getElementById("theme-select").value = savedTheme;
+    document.body.setAttribute("data-theme", savedTheme);
+
     try {
         const res = await fetch("/api/auth", {
             method: "POST",
@@ -16,248 +18,259 @@ async function init() {
             body: JSON.stringify({ initData: tg?.initData || "" })
         });
         if (res.ok) {
-            user = await res.json();
-            renderUser();
+            const data = await res.json();
+            user = { id: data.user_id, name: data.first_name || data.username || "User", role: data.role };
+            
+            document.getElementById("bal-rub").innerText = data.balance_rub.toFixed(2);
+            document.getElementById("bal-bonus").innerText = `${data.bonus_balance.toFixed(2)} ₽`;
+            
+            if (user.role === "admin") {
+                document.getElementById("role-badge").innerText = "ADMIN";
+                document.getElementById("nav-admin").classList.remove("hidden");
+            }
         }
-    } catch (e) {
-        console.error(e);
-    }
+    } catch (e) { console.error(e); }
 }
 
-function renderUser() {
-    document.getElementById("balance-val").innerText = (user.balance_rub || 0).toFixed(2);
-    document.getElementById("bonus-val").innerText = `${(user.bonus_balance || 0).toFixed(2)} ₽`;
-
-    if (user.role === "admin") {
-        document.getElementById("user-role-badge").innerText = "SUPER ADMIN";
-        document.getElementById("nav-admin").classList.remove("hidden");
-        loadAdminStats();
-    }
+function changeTheme() {
+    const t = document.getElementById("theme-select").value;
+    document.body.setAttribute("data-theme", t);
+    localStorage.setItem("theme", t);
 }
 
-function switchView(tab) {
+// Навигация
+function switchTab(tab) {
     document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    document.getElementById(`view-${tab}`).classList.remove("hidden");
+    document.getElementById(`nav-${tab}`).classList.add("active");
 
-    if (tab === "home") {
-        document.getElementById("tab-home").classList.remove("hidden");
-        document.getElementById("nav-home").classList.add("active");
-    } else if (tab === "support") {
-        document.getElementById("tab-support").classList.remove("hidden");
-        document.getElementById("nav-support").classList.add("active");
-        loadChat();
-    } else if (tab === "admin") {
-        document.getElementById("tab-admin").classList.remove("hidden");
-        document.getElementById("nav-admin").classList.add("active");
-        loadAdminStats();
-    }
+    if (tab === "support") loadUserChat();
+    if (tab === "admin") loadAdminChatsList();
 }
 
-// ДЕПОЗИТ
-function openDeposit() {
-    document.getElementById("modal-deposit").classList.add("active");
-    recalc();
+function openModal(id) { 
+    document.getElementById(id).classList.add("active"); 
+    if (id === 'modal-ref') loadRefs();
 }
+function closeModal(id) { document.getElementById(id).classList.remove("active"); }
 
-function closeDeposit() {
-    document.getElementById("modal-deposit").classList.remove("active");
-}
-
-function setMethod(el, method) {
-    document.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+// --- ДЕПОЗИТ (С защитой от спама) ---
+function setDep(el, method) {
+    document.querySelectorAll("#dep-step-1 .pill").forEach(p => p.classList.remove("active"));
     el.classList.add("active");
-    currentMethod = method;
-
-    const pdfSec = document.getElementById("pdf-section");
-    const btn = document.getElementById("btn-dep-action");
-
-    if (method === "crypto") {
-        pdfSec.classList.add("hidden");
-        btn.innerText = "Перейти к оплате";
-    } else {
-        pdfSec.classList.remove("hidden");
-        btn.innerText = "Отправить чек на проверку";
-    }
-    recalc();
+    depMethod = method;
+    calcDep();
 }
 
-function recalc() {
-    const val = parseFloat(document.getElementById("dep-amount").value) || 0;
-    const desc = document.getElementById("crypto-desc");
-
-    if (currentMethod === "crypto") {
-        desc.innerText = `К оплате в CryptoBot: ${(val * 1.4).toFixed(2)} ₽ (+40% наценка)`;
-    } else if (currentMethod === "kaspi") {
-        desc.innerText = `Реквизиты Kaspi: +7 777 000 0000 | Сумма: ${(val * 8).toFixed(2)} ₸`;
-    } else {
-        desc.innerText = `Реквизиты Monobank: 4441 1111 2222 3333 | Сумма: ${(val * 0.8).toFixed(2)} ₴`;
-    }
+function calcDep() {
+    const v = parseFloat(document.getElementById("dep-amt").value) || 0;
+    const h = document.getElementById("dep-hint");
+    if (depMethod === 'crypto') h.innerText = `К оплате: ${(v*1.4).toFixed(2)} ₽`;
+    else if (depMethod === 'kaspi') h.innerText = `К оплате: ${(v*8).toFixed(2)} ₸`;
+    else h.innerText = `К оплате: ${(v*0.8).toFixed(2)} ₴`;
 }
 
-function fileChosen(input) {
-    if (input.files && input.files[0]) {
-        const file = input.files[0];
-        if (!file.name.toLowerCase().endsWith(".pdf")) {
-            alert("Разрешены исключительно PDF файлы!");
-            input.value = "";
-            return;
-        }
-        selectedFile = file;
-        document.getElementById("pdf-name").innerText = `✅ Выбран: ${file.name}`;
+function depNext() {
+    const amt = parseFloat(document.getElementById("dep-amt").value);
+    if (!amt || amt < 100) return alert("Минимум 100 ₽");
+    
+    document.getElementById("dep-step-1").classList.add("hidden");
+    document.getElementById("dep-step-2").classList.remove("hidden");
+    const txt = document.getElementById("dep-confirm-txt");
+    const fb = document.getElementById("dep-file-box");
+    
+    if (depMethod === 'crypto') {
+        txt.innerHTML = `Подтвердите создание счета на <b>${amt} ₽</b>.<br>С комиссией: <b>${(amt*1.4).toFixed(2)} ₽</b>`;
+        fb.classList.add("hidden");
+    } else {
+        txt.innerHTML = `Переведите нужную сумму по реквизитам и <b>обязательно</b> прикрепите PDF-чек. Без него оплата не пройдет.`;
+        fb.classList.remove("hidden");
     }
 }
 
-async function handleDepositSubmit() {
-    const amount = parseFloat(document.getElementById("dep-amount").value);
-    if (!amount || amount < 100) {
-        alert("Минимальная сумма пополнения — 100 ₽");
-        return;
-    }
+async function depSubmit() {
+    const btn = document.getElementById("btn-dep-submit");
+    if (btn.disabled) return; // ANTI-SPAM GUARD
 
-    if (currentMethod === "crypto") {
-        try {
-            const res = await fetch("/api/deposit/crypto", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount_rub: amount, initData: tg?.initData || "" })
-            });
-            const data = await res.json();
-            if (res.ok && data.pay_url) {
-                closeDeposit();
-                if (tg?.openTelegramLink) tg.openTelegramLink(data.pay_url);
-                else window.open(data.pay_url, "_blank");
-            } else {
-                alert(data.detail || "Ошибка выставления счета");
-            }
-        } catch (e) {
-            alert("Ошибка сети");
-        }
-    } else {
-        if (!selectedFile) {
-            alert("Пожалуйста, прикрепите PDF-чек оплаты!");
-            return;
-        }
-        const formData = new FormData();
-        formData.append("initData", tg?.initData || "");
-        formData.append("amount_rub", amount);
-        formData.append("currency", currentMethod === "kaspi" ? "KZT" : "UAH");
-        formData.append("receipt", selectedFile);
+    const amt = parseFloat(document.getElementById("dep-amt").value);
+    
+    if (depMethod !== 'crypto') {
+        const file = document.getElementById("dep-file").files[0];
+        if (!file) return alert("Прикрепите PDF чек!");
+        if (!file.name.toLowerCase().endswith(".pdf")) return alert("Только PDF!");
+        
+        btn.disabled = true;
+        btn.innerText = "Отправка...";
+        
+        const fd = new FormData();
+        fd.append("initData", tg?.initData || "");
+        fd.append("amount_rub", amt);
+        fd.append("currency", depMethod === 'kaspi' ? "KZT" : "UAH");
+        fd.append("receipt", file);
 
         try {
-            const res = await fetch("/api/deposit/pdf-receipt", {
-                method: "POST",
-                body: formData
+            const r = await fetch("/api/deposit/pdf-receipt", { method: "POST", body: fd });
+            if (r.ok) { alert("Чек отправлен!"); closeModal('modal-deposit'); }
+            else alert("Ошибка");
+        } catch(e) {}
+        
+        btn.disabled = false;
+        btn.innerText = "Подтверждаю оплату";
+    } else {
+        btn.disabled = true;
+        btn.innerText = "Создание счета...";
+        try {
+            const r = await fetch("/api/deposit/crypto", {
+                method: "POST", headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ initData: tg?.initData||"", amount_rub: amt })
             });
-            const data = await res.json();
-            if (res.ok) {
-                alert("Чек получен! Ожидайте подтверждения дропом.");
-                closeDeposit();
-            } else {
-                alert(data.detail || "Ошибка отправки чека");
-            }
-        } catch (e) {
-            alert("Ошибка отправки файла");
-        }
+            const d = await r.json();
+            if (r.ok && d.pay_url) { tg?.openTelegramLink ? tg.openTelegramLink(d.pay_url) : window.open(d.pay_url); closeModal('modal-deposit'); }
+            else alert(d.detail || "Ошибка");
+        } catch(e) {}
+        btn.disabled = false;
+        btn.innerText = "Подтверждаю оплату";
     }
 }
 
-// ЧАТ ПОДДЕРЖКИ
-async function loadChat() {
+// --- ПОКУПКА ---
+async function submitPurchase() {
+    const btn = document.getElementById("btn-pur");
+    if (btn.disabled) return;
+    
+    const amt = parseFloat(document.getElementById("pur-amt").value);
+    const desc = document.getElementById("pur-desc").value;
+    const file = document.getElementById("pur-photo").files[0];
+    
+    if (!amt || !desc) return alert("Заполните сумму и реквизиты");
+    
+    btn.disabled = true;
+    btn.innerText = "Отправка...";
+    
+    const fd = new FormData();
+    fd.append("initData", tg?.initData || "");
+    fd.append("amount", amt);
+    fd.append("details", desc);
+    if (file) fd.append("photo", file);
+
     try {
-        const res = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}`);
-        const data = await res.json();
-        const box = document.getElementById("chat-messages");
-        box.innerHTML = `
-            <div class="msg-operator">
-                <div class="tag">ОПЕРАТОР</div>
-                <div class="bubble">Здравствуйте! Чем можем помочь?</div>
-            </div>
-        `;
-        data.forEach(m => {
-            if (m.sender === "user") {
-                box.innerHTML += `
-                    <div class="msg-user">
-                        <div class="tag">ЮЗЕР</div>
-                        <div class="bubble">${m.text}</div>
-                    </div>
-                `;
-            } else {
-                box.innerHTML += `
-                    <div class="msg-operator">
-                <div class="tag">ОПЕРАТОР</div>
-                        <div class="bubble">${m.text}</div>
-                    </div>
-                `;
-            }
+        const r = await fetch("/api/purchase", { method: "POST", body: fd });
+        const d = await r.json();
+        if (r.ok) { alert("Заявка создана!"); closeModal('modal-purchase'); }
+        else alert(d.detail || "Ошибка");
+    } catch(e) {}
+    btn.disabled = false;
+    btn.innerText = "Создать заявку";
+}
+
+// --- ПРОМОКОД И РЕФЕРАЛЫ ---
+async function activatePromo() {
+    const btn = document.getElementById("btn-promo");
+    if (btn.disabled) return;
+    const c = document.getElementById("promo-val").value;
+    if (!c) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Проверка...";
+    try {
+        const r = await fetch("/api/promo/activate", {
+            method: "POST", headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ initData: tg?.initData||"", code: c })
         });
-        box.scrollTop = box.scrollHeight;
-    } catch (e) {}
+        const d = await r.json();
+        if (r.ok) { alert(`Успех! Начислено: ${d.amount} ₽`); closeModal('modal-promo'); initApp(); }
+        else alert(d.detail);
+    } catch(e) {}
+    btn.disabled = false;
+    btn.innerText = "Активировать";
 }
 
-async function sendSupportMessage() {
-    const input = document.getElementById("support-input");
-    const text = input.value.trim();
-    if (!text) return;
-
-    input.value = "";
-    const box = document.getElementById("chat-messages");
-    box.innerHTML += `
-        <div class="msg-user">
-            <div class="tag">ЮЗЕР</div>
-            <div class="bubble">${text}</div>
-        </div>
-    `;
-    box.scrollTop = box.scrollHeight;
-
-    await fetch("/api/support/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData: tg?.initData || "", text: text })
-    });
-}
-
-// АДМИНКА
-async function loadAdminStats() {
+async function loadRefs() {
     try {
-        const res = await fetch(`/api/admin/stats?initData=${encodeURIComponent(tg?.initData || "")}`);
-        if (res.ok) {
-            const data = await res.json();
-            document.getElementById("admin-turnover").innerHTML = `${data.turnover.toFixed(2)} <span>₽</span>`;
-            document.getElementById("admin-users-cnt").innerText = data.total_users;
-            document.getElementById("admin-tx-cnt").innerText = data.total_tx;
+        const r = await fetch(`/api/referral/stats?initData=${encodeURIComponent(tg?.initData||"")}`);
+        if (r.ok) {
+            const d = await r.json();
+            document.getElementById("ref-count").innerText = d.referrals;
+            document.getElementById("ref-link").value = d.link;
         }
-    } catch (e) {}
+    } catch(e){}
 }
 
-async function createPromo() {
-    const code = document.getElementById("promo-code").value;
-    const amount = document.getElementById("promo-amount").value;
-    if (!code || !amount) return alert("Заполните поля!");
-
-    const res = await fetch("/api/admin/promocode/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData: tg?.initData || "", code: code, amount: amount })
+// --- ПОДДЕРЖКА (ЮЗЕР) ---
+async function loadUserChat() {
+    const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData||"")}`);
+    const d = await r.json();
+    const b = document.getElementById("user-chat-box");
+    b.innerHTML = "";
+    d.forEach(m => {
+        const isUser = m.sender === 'user';
+        b.innerHTML += `
+            <div class="msg ${isUser ? 'right' : 'left'}">
+                <div style="font-size:10px; opacity:0.7; margin-bottom:4px;">${isUser ? user.name : 'Оператор'}</div>
+                <div>${m.text}</div>
+            </div>`;
     });
-    if (res.ok) {
-        alert("Промокод успешно создан!");
-        document.getElementById("promo-code").value = "";
-        document.getElementById("promo-amount").value = "";
-    } else {
-        const d = await res.json();
-        alert(d.detail || "Ошибка");
+    b.scrollTop = b.scrollHeight;
+}
+
+async function sendMsgUser() {
+    const i = document.getElementById("user-chat-input");
+    const v = i.value.trim();
+    if (!v) return;
+    i.value = "";
+    await fetch("/api/support/send", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ initData: tg?.initData||"", text: v })
+    });
+    loadUserChat();
+}
+
+// --- ПОДДЕРЖКА (АДМИН) ---
+async function loadAdminChatsList() {
+    const r = await fetch(`/api/support/chats?initData=${encodeURIComponent(tg?.initData||"")}`);
+    if (r.ok) {
+        const d = await r.json();
+        const l = document.getElementById("admin-chat-list");
+        l.innerHTML = "";
+        d.forEach(c => {
+            const n = c.first_name || c.username || c.user_id;
+            l.innerHTML += `<div class="chat-item" onclick="openAdminChat(${c.user_id}, '${n}')">💬 ${n} (ID: ${c.user_id})</div>`;
+        });
     }
 }
 
-async function runSql() {
-    const q = document.getElementById("sql-query").value;
-    const res = await fetch("/api/admin/sql", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData: tg?.initData || "", query: q })
+async function openAdminChat(uid, name) {
+    activeAdminChatUser = uid;
+    document.getElementById("view-admin").classList.add("hidden");
+    document.getElementById("view-admin-chat").classList.remove("hidden");
+    document.getElementById("admin-chat-title").innerText = `Чат: ${name}`;
+    
+    const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData||"")}&target_uid=${uid}`);
+    const d = await r.json();
+    const b = document.getElementById("admin-chat-box");
+    b.innerHTML = "";
+    d.forEach(m => {
+        const isUser = m.sender === 'user';
+        b.innerHTML += `
+            <div class="msg ${isUser ? 'left' : 'right'}">
+                <div style="font-size:10px; opacity:0.7; margin-bottom:4px;">${isUser ? name : 'Вы'}</div>
+                <div>${m.text}</div>
+            </div>`;
     });
-    const d = await res.json();
-    document.getElementById("sql-res").innerText = JSON.stringify(d, null, 2);
+    b.scrollTop = b.scrollHeight;
 }
 
-init();
+async function sendMsgAdmin() {
+    const i = document.getElementById("admin-chat-input");
+    const v = i.value.trim();
+    if (!v || !activeAdminChatUser) return;
+    i.value = "";
+    await fetch("/api/support/send", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ initData: tg?.initData||"", text: v, target_uid: activeAdminChatUser })
+    });
+    openAdminChat(activeAdminChatUser, document.getElementById("admin-chat-title").innerText.replace("Чат: ", ""));
+}
+
+window.onload = initApp;
