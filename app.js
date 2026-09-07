@@ -3,7 +3,6 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.expand();
     tg.ready();
-    // Калибровка под высоту экрана устройства
     const setHeight = () => document.documentElement.style.setProperty('--tg-viewport-stable-height', `${tg.viewportStableHeight || window.innerHeight}px`);
     tg.onEvent('viewportChanged', setHeight);
     setHeight();
@@ -14,11 +13,35 @@ let depMethod = 'crypto';
 let activeAdminChatUser = null;
 let chatInterval = null;
 
-// Переменные для отзывов и чата
 let currentReviewTxId = null;
 let currentReviewStars = 5;
 let renderedMessagesCount = 0;
 let renderedAdminMessagesCount = 0;
+let particleInterval = null;
+
+// --- ИНЖЕКТ CSS ДЛЯ ПАРТИКЛОВ ---
+const particleStyle = document.createElement('style');
+particleStyle.innerHTML = `
+    .particle {
+        position: fixed;
+        top: -50px;
+        z-index: 0; /* Под карточками, чтобы не мешать тексту */
+        pointer-events: none;
+        animation: fall linear forwards;
+        opacity: 0.6;
+    }
+    @keyframes fall {
+        to { transform: translateY(110vh) rotate(360deg); }
+    }
+`;
+document.head.appendChild(particleStyle);
+
+// --- ГЛОБАЛЬНАЯ ТАКТИЛЬНАЯ ОТДАЧА ---
+document.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.btn') || e.target.closest('.pill') || e.target.closest('.nav-btn')) {
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    }
+}, {passive: true});
 
 function showToast(message) {
     const toast = document.getElementById("toast");
@@ -30,9 +53,13 @@ function showToast(message) {
 
 async function initApp() {
     const t = localStorage.getItem("theme") || "basic";
-    document.getElementById("theme-select").value = t;
+    const p = localStorage.getItem("particles") || "none";
     
-    // Применение кастомного фона
+    document.getElementById("theme-select").value = t;
+    // Ожидаем, что в index.html появится селект для партиклов с id="particles-select"
+    const pSelect = document.getElementById("particles-select");
+    if(pSelect) pSelect.value = p;
+    
     if (t === "custom") {
         const bg = localStorage.getItem("custom_bg");
         if (bg) {
@@ -44,6 +71,8 @@ async function initApp() {
         document.body.classList.remove("custom-bg-active");
         document.body.setAttribute("data-theme", t);
     }
+    
+    setParticles(p); // Запуск партиклов
     
     try {
         const r = await fetch("/api/auth", {
@@ -57,20 +86,17 @@ async function initApp() {
             document.getElementById("user-display").innerText = `@${user.username || user.first_name || "Пользователь"}`;
             document.getElementById("bal-rub").innerText = user.balance_rub.toFixed(2);
             document.getElementById("bal-bonus").innerText = `${user.bonus_balance.toFixed(2)} ₽`;
-            
-            // Если используется прямой запуск в WebApp, линк может быть другим, но оставляем классический:
-            document.getElementById("ref-link").value = `https://t.me/SwapPay_Bot?start=ref_${user.user_id}`;
+            document.getElementById("ref-link").value = `https://t.me/swapaapaaAPP_bot?start=ref_${user.user_id}`;
 
             if (user.role === "admin") document.getElementById("nav-admin").classList.remove("hidden");
             
-            // Парсинг ID заказа для отзыва из start_param
             const startParam = tg?.initDataUnsafe?.start_param;
             if (startParam && startParam.startsWith('review_')) {
                 currentReviewTxId = parseInt(startParam.split('_')[1]);
                 openModal('modal-review-add');
             }
         }
-    } catch (e) { showToast("Ошибка авторизации"); }
+    } catch (e) { showToast("Ошибка связи с сервером"); }
 }
 
 function changeTheme() {
@@ -101,6 +127,44 @@ function loadCustomBg(input) {
     }
 }
 
+// --- ДВИЖОК ПАРТИКЛОВ (ОПТИМИЗИРОВАННЫЙ) ---
+function changeParticles() {
+    const type = document.getElementById("particles-select").value;
+    setParticles(type);
+}
+
+function setParticles(type) {
+    localStorage.setItem('particles', type);
+    document.querySelectorAll('.particle').forEach(p => p.remove());
+    clearInterval(particleInterval);
+
+    if (type === 'none') return;
+
+    const emojis = {
+        'snow': ['❄️', '🌨'],
+        'leaves': ['🍂', '🍃', '🍁'],
+        'money': ['💵', '💸', '💰'],
+        'water': ['🛢️', '💧', '🧊'] // 5-литровые бутылки воды и капли
+    }[type];
+
+    if(!emojis) return;
+
+    const maxParticles = 25; // Ограничение для оптимизации
+    particleInterval = setInterval(() => {
+        if(document.querySelectorAll('.particle').length > maxParticles) return;
+
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.animationDuration = (Math.random() * 3 + 4) + 's'; // От 4 до 7 секунд
+        p.style.fontSize = (Math.random() * 10 + 15) + 'px'; // Размер 15-25px
+        document.body.appendChild(p);
+
+        setTimeout(() => { p.remove(); }, 7000);
+    }, 450);
+}
+
 function switchTab(tab) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
@@ -112,7 +176,6 @@ function switchTab(tab) {
     clearInterval(chatInterval);
     
     if (tab === "support") {
-        // Очищаем локальный счетчик и сам DOM-контейнер при входе на вкладку
         renderedMessagesCount = 0;
         document.getElementById("user-chat-box").innerHTML = ""; 
         loadUserChat(); 
@@ -277,7 +340,7 @@ function setReviewStars(num) {
 }
 
 async function submitReview() {
-    if(!currentReviewTxId) return showToast("Отзыв можно оставить только перейдя по кнопке из уведомления!");
+    if(!currentReviewTxId) return showToast("Оставить отзыв можно только по кнопке из уведомления!");
     const txt = document.getElementById("review-text").value;
     if(!txt) return showToast("Напишите текст отзыва!");
     try {
@@ -300,18 +363,13 @@ async function loadUserChat() {
         const d = await r.json(); 
         const b = document.getElementById("user-chat-box");
         
-        // Управление состояниями (Закрыт/Открыт)
         if (d.status === 'closed') {
             document.getElementById("sup-status").innerText = "Диалог завершен"; 
             document.getElementById("user-chat-input-wrap").classList.add("hidden"); 
             document.getElementById("btn-reopen-chat").classList.remove("hidden");
-        } else {
-            document.getElementById("sup-status").innerText = "Чат с поддержкой"; 
-            document.getElementById("user-chat-input-wrap").classList.remove("hidden"); 
-            document.getElementById("btn-reopen-chat").classList.add("hidden");
         }
         
-        // APPEND-ONLY: добавляем только НОВЫЕ сообщения
+        // Append-Only
         if (d.messages.length > renderedMessagesCount) {
             for(let i = renderedMessagesCount; i < d.messages.length; i++) {
                 let m = d.messages[i];
@@ -321,29 +379,26 @@ async function loadUserChat() {
                 b.appendChild(div);
             }
             b.scrollTop = b.scrollHeight;
-            renderedMessagesCount = d.messages.length; // Обновляем счетчик!
+            renderedMessagesCount = d.messages.length;
         }
     } catch (e) {}
 }
 
 function reopenChat() {
-    const btn = document.getElementById("btn-reopen-chat");
-    btn.disabled = true;
-    let secs = 10;
-    btn.innerText = `Подключение... ${secs}с`;
+    document.getElementById("btn-reopen-chat").classList.add("hidden");
+    document.getElementById("user-chat-input-wrap").classList.remove("hidden");
     
-    // Задержка в 10 секунд перед открытием чата
+    let secs = 10;
+    document.getElementById("sup-status").innerText = `Поиск оператора... ${secs}с`;
+    
+    // Инпут разблокирован. Таймер просто визуально тикает, давая фору
     const intv = setInterval(() => {
         secs--;
-        btn.innerText = `Подключение... ${secs}с`;
-        if(secs <= 0) {
+        if(secs > 0) {
+            document.getElementById("sup-status").innerText = `Поиск оператора... ${secs}с`;
+        } else {
             clearInterval(intv);
-            btn.classList.add("hidden");
-            btn.disabled = false;
-            btn.innerText = "Начать новый диалог";
-            
-            document.getElementById("user-chat-input-wrap").classList.remove("hidden");
-            document.getElementById("sup-status").innerText = "Новый диалог";
+            document.getElementById("sup-status").innerText = "Чат с поддержкой";
         }
     }, 1000);
 }
@@ -400,15 +455,14 @@ async function openAdminChat(uid, name) {
     setTimeout(() => document.getElementById("view-admin-chat").classList.add("active"), 50);
     
     clearInterval(chatInterval);
-    renderedAdminMessagesCount = 0; // Сбрасываем счетчик для админа
-    document.getElementById("admin-chat-box").innerHTML = ""; // Очищаем старый чат перед открытием нового
+    renderedAdminMessagesCount = 0;
+    document.getElementById("admin-chat-box").innerHTML = ""; 
     
     const fetchChat = async () => {
         const r = await fetch(`/api/support/messages?initData=${encodeURIComponent(tg?.initData || "")}&target_uid=${uid}`);
         const d = await r.json(); 
         const b = document.getElementById("admin-chat-box");
         
-        // APPEND-ONLY для админа
         if (d.messages.length > renderedAdminMessagesCount) {
             for(let i = renderedAdminMessagesCount; i < d.messages.length; i++) {
                 let m = d.messages[i];
