@@ -5,236 +5,427 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SwapPay</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #0e1621;
-            --card-bg: #17212b;
-            --btn-bg: #242f3d;
-            --btn-hover: #2b394a;
-            --primary: #5288c1;
-            --text-main: #ffffff;
-            --text-muted: #798b9c;
-            --accent-blue: #2f6ea5;
-            --border-color: rgba(255, 255, 255, 0.05);
+            --bg-body: #0d121a;
+            --bg-card: #151d28;
+            --bg-card-inner: #1c2635;
+            --bg-btn: #202c3d;
+            --bg-btn-hover: #2a3a50;
+            --accent-blue: #3a86ff;
+            --accent-cyan: #00f0ff;
+            --accent-green: #00e676;
+            --text-primary: #ffffff;
+            --text-secondary: #8a99ad;
+            --border-subtle: rgba(255, 255, 255, 0.07);
+            --border-focus: rgba(58, 134, 255, 0.4);
+            --shadow-glow: 0 8px 32px rgba(0, 0, 0, 0.35);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            padding: 14px;
-            font-size: 14px;
-        }
-
-        .container { max-width: 480px; margin: 0 auto; }
-
-        /* Верхние вкладки */
-        .tabs {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            padding: 12px 14px 80px 14px;
             display: flex;
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-        .tab-btn {
-            flex: 1;
-            padding: 10px;
-            background: var(--btn-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-align: center;
-            cursor: pointer;
-        }
-        .tab-btn.active {
-            background: var(--accent-blue);
-            color: #fff;
+            justify-content: center;
         }
 
-        /* Карточка */
-        .card {
-            background: var(--card-bg);
-            border-radius: 14px;
-            overflow: hidden;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-            margin-bottom: 14px;
-            border: 1px solid var(--border-color);
-        }
-
-        /* Баннер в шапке */
-        .banner {
+        .container {
             width: 100%;
-            height: 120px;
-            background: linear-gradient(135deg, #1d3557, #457b9d);
+            max-width: 440px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            padding: 0 20px;
-            color: #fff;
+            gap: 14px;
         }
-        .banner h1 { font-size: 22px; margin-bottom: 4px; font-weight: 700; }
-        .banner p { font-size: 12px; opacity: 0.85; line-height: 1.3; }
 
-        /* Контент карточки */
-        .card-body { padding: 16px; }
+        /* 3D Баннер с градиентом */
+        .hero-banner {
+            position: relative;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #0072ff 100%);
+            border-radius: 20px;
+            padding: 22px 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 114, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
 
-        .info-row {
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -30px;
+            width: 130px;
+            height: 130px;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+            border-radius: 50%;
+        }
+
+        .hero-banner-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(8px);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hero-badge .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .hero-title {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+        }
+
+        .hero-sub {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.85);
+            max-width: 80%;
+            line-height: 1.4;
+        }
+
+        /* Главная карточка кошелька */
+        .wallet-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid var(--border-subtle);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .wallet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .wallet-header-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .user-tag {
+            font-size: 12px;
+            color: var(--accent-blue);
+            background: rgba(58, 134, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .balance-main {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .balance-main .currency-symbol {
+            color: var(--accent-blue);
+            font-size: 28px;
+        }
+
+        .balance-bonus {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            font-size: 13.5px;
-        }
-        .info-row span.label { color: var(--text-muted); }
-        .info-row span.val { font-weight: 600; }
-
-        .divider {
-            height: 1px;
-            background: var(--border-color);
-            margin: 14px 0;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 6px;
         }
 
-        /* Сетка кнопок в стиле меню бота */
-        .menu-grid {
+        .balance-bonus strong {
+            color: var(--accent-green);
+        }
+
+        /* Быстрая статистика */
+        .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 10px;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-subtle);
         }
-        .full-width { grid-column: span 2; }
 
-        .bot-btn {
-            background: var(--btn-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 13px 10px;
-            color: #fff;
+        .stat-item {
+            background: var(--bg-card-inner);
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .stat-val {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        /* Действия / Кнопки меню */
+        .actions-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin: 4px 0 2px 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn-action {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            padding: 15px 14px;
+            border-radius: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
             font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-action:active {
+            transform: scale(0.97);
+            background: var(--bg-btn-hover);
+        }
+
+        .btn-action.primary {
+            grid-column: span 2;
+            background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 6px 18px rgba(43, 108, 176, 0.35);
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .btn-action.primary:active {
+            background: linear-gradient(135deg, #255a94 0%, #2b6cb0 100%);
+        }
+
+        .icon-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            cursor: pointer;
-            transition: background 0.15s;
+            font-size: 16px;
         }
-        .bot-btn:active { background: var(--btn-hover); }
+
+        /* Информационный баннер курсов */
+        .rates-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .rates-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .rate-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12.5px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .rate-row:last-child { border-bottom: none; }
+        .rate-currency { color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+        .rate-val { font-weight: 700; color: #fff; }
+
+        /* Нижний плавающий бар для Drop/Admin */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(21, 29, 40, 0.85);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 12px;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 6px 14px;
+            border-radius: 12px;
+        }
+
+        .nav-item.active {
+            color: var(--accent-blue);
+            background: rgba(58, 134, 255, 0.1);
+        }
 
         .hidden { display: none !important; }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            background: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: #fff;
-            margin-top: 8px;
-            outline: none;
-        }
-        input:focus { border-color: var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- Навигация между панелями (показывается дропам и админам) -->
-    <div class="tabs hidden" id="nav-tabs">
-        <div class="tab-btn active" onclick="showView('cabinet')">Кабинет</div>
-        <div class="tab-btn hidden" id="tab-drop" onclick="showView('drop')">Дроп</div>
-        <div class="tab-btn hidden" id="tab-admin" onclick="showView('admin')">Админ</div>
+    <!-- Шапка-Баннер -->
+    <div class="hero-banner">
+        <div class="hero-banner-content">
+            <div class="hero-badge">
+                <div class="dot"></div>
+                SwapPay Official
+            </div>
+            <div class="hero-title">Быстрый обмен</div>
+            <div class="hero-sub">Пополнение балансов Kaspi, Monobank и CryptoBot без скрытых комиссий</div>
+        </div>
     </div>
 
-    <!-- 1. Экран "Личный кабинет" (как на скринах) -->
-    <div id="view-cabinet" class="view">
-        <div class="card">
-            <div class="banner">
-                <h1 id="banner-title">Личный кабинет</h1>
-                <p id="banner-sub">Управление балансом и переводами</p>
+    <!-- Основной Кошелек -->
+    <div class="wallet-card">
+        <div class="wallet-header">
+            <div class="wallet-header-title">Виртуальный счет</div>
+            <div class="user-tag" id="user-role-badge">USER</div>
+        </div>
+
+        <div class="balance-main">
+            <span id="balance">0.00</span>
+            <span class="currency-symbol">₽</span>
+        </div>
+
+        <div class="balance-bonus">
+            <span>Бонусный баланс:</span>
+            <strong id="bonus-balance">0.00 ₽</strong>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-label">Всего операций</div>
+                <div class="stat-val" id="stat-total">0</div>
             </div>
-            <div class="card-body">
-                <div class="info-row">
-                    <span>👑</span>
-                    <span class="label">Статус:</span>
-                    <span class="val" id="user-role">USER</span>
-                </div>
-                <div class="info-row">
-                    <span>🪪</span>
-                    <span class="label">Telegram ID:</span>
-                    <span class="val" id="user-tg-id">000000000</span>
-                </div>
-                <div class="info-row">
-                    <span>💳</span>
-                    <span class="label">Баланс:</span>
-                    <span class="val" id="user-balance">0.00 ₽</span>
-                </div>
-                <div class="info-row">
-                    <span>🎁</span>
-                    <span class="label">Бонусный баланс:</span>
-                    <span class="val" id="user-bonus">0.00 ₽</span>
-                </div>
-
-                <div class="divider"></div>
-
-                <div class="info-row">
-                    <span>📊</span>
-                    <span class="label">Статистика операций:</span>
-                </div>
-                <div style="padding-left: 24px; color: var(--text-muted); line-height: 1.6; font-size: 13px;">
-                    • Всего: <b style="color: #fff;" id="stat-total">0</b><br>
-                    • Успешных: <b style="color: #fff;" id="stat-success">0</b>
-                </div>
-
-                <div class="divider"></div>
-
-                <!-- Меню кнопок -->
-                <div class="menu-grid">
-                    <button class="bot-btn full-width" onclick="openDepositModal()">
-                        💳 Пополнить баланс
-                    </button>
-                    <button class="bot-btn" onclick="openBuyModal()">
-                        🏷 Купить / Оплатить
-                    </button>
-                    <button class="bot-btn" onclick="openProfileModal()">
-                        👤 Личный кабинет
-                    </button>
-                    <button class="bot-btn" onclick="openRefModal()">
-                        👥 Рефералы
-                    </button>
-                    <button class="bot-btn" onclick="openInfoModal()">
-                        ℹ️ Инфо / Курс
-                    </button>
-                    <button class="bot-btn full-width" onclick="openSupportModal()">
-                        💬 Поддержка
-                    </button>
-                </div>
+            <div class="stat-item">
+                <div class="stat-label">Успешных</div>
+                <div class="stat-val" style="color: var(--accent-green);" id="stat-success">0</div>
             </div>
         </div>
     </div>
 
-    <!-- 2. Экран Дропа (Заявки) -->
-    <div id="view-drop" class="view hidden">
-        <div class="card">
-            <div class="banner" style="background: linear-gradient(135deg, #2b5876, #4e4376);">
-                <h1>Заявки оператора</h1>
-                <p>Подтверждение и обработка чеков</p>
-            </div>
-            <div class="card-body" id="drop-list">
-                Загрузка транзакций...
-            </div>
-        </div>
+    <!-- Меню быстрых действий -->
+    <div class="actions-label">Операции</div>
+    <div class="action-grid">
+        <button class="btn-action primary" onclick="openDeposit()">
+            <span>💳</span> Пополнить баланс
+        </button>
+        <button class="btn-action" onclick="openBuy()">
+            <div class="icon-circle">🛍</div> Купить / Оплатить
+        </button>
+        <button class="btn-action" onclick="openCrypto()">
+            <div class="icon-circle">💎</div> Купить USDT
+        </button>
+        <button class="btn-action" onclick="openReferrals()">
+            <div class="icon-circle">👥</div> Рефералы
+        </button>
+        <button class="btn-action" onclick="openPromo()">
+            <div class="icon-circle">🎁</div> Промокод
+        </button>
+        <button class="btn-action" style="grid-column: span 2;" onclick="openSupport()">
+            <div class="icon-circle">💬</div> Поддержка сервиса
+        </button>
     </div>
 
-    <!-- 3. Экран Админа -->
-    <div id="view-admin" class="view hidden">
-        <div class="card">
-            <div class="banner" style="background: linear-gradient(135deg, #1f4037, #99f2c8); color: #111;">
-                <h1 style="color: #0b2219;">Админ-центр</h1>
-                <p style="color: #0b2219;">Статистика и управление сервисом</p>
-            </div>
-            <div class="card-body" id="admin-stats">
-                Загрузка статистики...
-            </div>
+    <!-- Виджет курсов -->
+    <div class="rates-card">
+        <div class="rates-header">
+            <span>🔄</span> Актуальные курсы
         </div>
+        <div class="rate-row">
+            <div class="rate-currency">🇰🇿 Казахстан (Kaspi)</div>
+            <div class="rate-val">1 ₽ = 8.00 ₸</div>
+        </div>
+        <div class="rate-row">
+            <div class="rate-currency">🇺🇦 Украина (Monobank)</div>
+            <div class="rate-val">1 ₽ = 0.80 ₴</div>
+        </div>
+        <div class="rate-row">
+            <div class="rate-currency">💎 USDT Tether</div>
+            <div class="rate-val">1 USDT ≈ 95.00 ₽</div>
+        </div>
+    </div>
+</div>
+
+<!-- Нижняя панель для дропов / админов -->
+<div class="bottom-nav hidden" id="bottom-bar">
+    <div class="nav-item active" onclick="switchTab('user')">
+        <span>👤</span> Кабинет
+    </div>
+    <div class="nav-item hidden" id="nav-drop" onclick="switchTab('drop')">
+        <span>📦</span> Дроп-центр
+    </div>
+    <div class="nav-item hidden" id="nav-admin" onclick="switchTab('admin')">
+        <span>⚡️</span> Админка
     </div>
 </div>
 
