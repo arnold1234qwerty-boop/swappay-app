@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import time
 from importlib import import_module
 
-BOT_TOKEN = "8695905699:AAH2i5C825HkRrS3bkgAMp-UOE-PxV4tB04" # Укажите токен вашего бота
+BOT_TOKEN = "8695905699:AAGuQ_PWRFPcBmnWBO6FsTmj3_FIygaRwww" # Укажите токен вашего бота
 DB_PATH = "bot_database.db"
 
 app = FastAPI(title="SwapPay WebApp API")
