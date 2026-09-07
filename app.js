@@ -4,18 +4,16 @@ if (tg) {
     tg.ready();
 }
 
-const ADMIN_ID = 7531770025;
-
 let currentUser = {
-    user_id: ADMIN_ID, // По умолчанию для тестов
+    user_id: 0,
     role: "user",
-    balance_rub: 350.00,
+    drop: "not",
+    balance_rub: 0.00,
     bonus_balance: 0.00
 };
 
-let currentMethod = 'kaspi';
+let currentMethod = 'crypto';
 
-// Инициализация при старте
 async function initApp() {
     try {
         const res = await fetch('/api/auth', {
@@ -25,54 +23,34 @@ async function initApp() {
         });
         if (res.ok) {
             currentUser = await res.json();
+            renderUser();
         }
     } catch (e) {
-        console.warn("Локальный тест без бэкенда авторизации:", e);
+        console.error("Auth error", e);
     }
-
-    renderUser();
 }
 
 function renderUser() {
     document.getElementById('balance').innerText = (currentUser.balance_rub || 0).toFixed(2);
     document.getElementById('bonus-balance').innerText = `${(currentUser.bonus_balance || 0).toFixed(2)} ₽`;
-    document.getElementById('modal-buy-bal').innerText = `${(currentUser.balance_rub || 0).toFixed(2)} ₽`;
 
-    // Проверка прав администратора
-    if (currentUser.user_id === ADMIN_ID || currentUser.role === 'admin') {
-        document.getElementById('user-role-badge').innerText = 'ADMIN';
+    if (currentUser.role === 'admin') {
+        document.getElementById('user-role-badge').innerText = 'SUPER ADMIN';
         document.getElementById('admin-bottom-bar').classList.remove('hidden');
     } else {
         document.getElementById('user-role-badge').innerText = currentUser.role.toUpperCase();
     }
-
-    // Реферальная ссылка
-    const refLink = `https://t.me/SwapPayment_bot?start=ref_${currentUser.user_id}`;
-    document.getElementById('ref-link-input').value = refLink;
 }
 
-// Управление шторками (модалками)
 function openDepositModal() {
     document.getElementById('modal-deposit').classList.add('active');
-}
-
-function openBuyModal() {
-    document.getElementById('modal-buy').classList.add('active');
-}
-
-function openRefModal() {
-    document.getElementById('modal-ref').classList.add('active');
-}
-
-function openPromoModal() {
-    document.getElementById('modal-promo').classList.add('active');
+    calcExchange();
 }
 
 function closeModals() {
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
 }
 
-// Выбор метода пополнения и автокалькулятор
 function selectMethod(el, method) {
     document.querySelectorAll('.method-pill').forEach(p => p.classList.remove('active'));
     el.classList.add('active');
@@ -84,41 +62,61 @@ function calcExchange() {
     const val = parseFloat(document.getElementById('deposit-amount').value) || 0;
     const calcEl = document.getElementById('deposit-calc');
 
-    if (currentMethod === 'kaspi') {
+    if (currentMethod === 'crypto') {
+        const total = (val * 1.4).toFixed(2);
+        calcEl.innerText = `К оплате в CryptoBot: ${total} ₽ (+40% комиссия)`;
+    } else if (currentMethod === 'kaspi') {
         calcEl.innerText = `К оплате: ${(val * 8).toFixed(2)} ₸`;
-    } else if (currentMethod === 'mono') {
-        calcEl.innerText = `К оплате: ${(val * 0.8).toFixed(2)} ₴`;
     } else {
-        calcEl.innerText = `К оплате: ≈ ${(val / 95).toFixed(2)} USDT`;
+        calcEl.innerText = `К оплате: ${(val * 0.8).toFixed(2)} ₴`;
     }
 }
 
-function submitDeposit() {
-    const amount = document.getElementById('deposit-amount').value;
+async function submitDeposit() {
+    const amount = parseFloat(document.getElementById('deposit-amount').value);
     if (!amount || amount < 100) {
-        alert("Минимальная сумма пополнения — 100 ₽");
+        alert("Минимальная сумма — 100 ₽");
         return;
     }
-    closeModals();
-    alert(`Заявка на ${amount} ₽ сформирована. Реквизиты отправлены в чат бота.`);
-}
 
-function copyRefLink() {
-    const copyText = document.getElementById("ref-link-input");
-    copyText.select();
-    navigator.clipboard.writeText(copyText.value);
-    alert("Ссылка скопирована в буфер!");
-}
+    if (currentMethod === 'crypto') {
+        const btn = document.getElementById('btn-deposit-submit');
+        btn.disabled = true;
+        btn.innerText = "Создаем счет...";
 
-function openSupport() {
-    if (tg?.openTelegramLink) {
-        tg.openTelegramLink("https://t.me/ForestEclipse");
+        try {
+            const res = await fetch('/api/deposit/crypto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount_rub: amount,
+                    initData: tg?.initData || ""
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.pay_url) {
+                closeModals();
+                // Открываем инвойс прямо в клиенте Telegram
+                if (tg?.openTelegramLink) {
+                    tg.openTelegramLink(data.pay_url);
+                } else {
+                    window.open(data.pay_url, "_blank");
+                }
+            } else {
+                alert(data.detail || "Не удалось создать счет");
+            }
+        } catch (e) {
+            alert("Ошибка сети при обращении к серверу");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Перейти к оплате";
+        }
     } else {
-        window.open("https://t.me/ForestEclipse", "_blank");
+        alert("Для Kaspi и Mono загрузка чека будет следующим шагом.");
     }
 }
 
-// Переключение между вкладками (Кабинет / Админка)
 function switchTab(tab) {
     if (tab === 'user') {
         document.getElementById('view-user').classList.remove('hidden');
