@@ -3,7 +3,7 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.expand();
     tg.ready();
-    // Динамическая калибровка экрана для предотвращения скачков
+    // Калибровка под высоту экрана устройства
     const setHeight = () => document.documentElement.style.setProperty('--tg-viewport-stable-height', `${tg.viewportStableHeight || window.innerHeight}px`);
     tg.onEvent('viewportChanged', setHeight);
     setHeight();
@@ -14,9 +14,11 @@ let depMethod = 'crypto';
 let activeAdminChatUser = null;
 let chatInterval = null;
 
-// Переменные для отзывов
+// Переменные для отзывов и чата
 let currentReviewTxId = null;
 let currentReviewStars = 5;
+let renderedMessagesCount = 0;
+let renderedAdminMessagesCount = 0;
 
 function showToast(message) {
     const toast = document.getElementById("toast");
@@ -30,11 +32,16 @@ async function initApp() {
     const t = localStorage.getItem("theme") || "basic";
     document.getElementById("theme-select").value = t;
     
+    // Применение кастомного фона
     if (t === "custom") {
         const bg = localStorage.getItem("custom_bg");
-        if (bg) document.body.style.backgroundImage = `url(${bg})`;
+        if (bg) {
+            document.body.style.backgroundImage = `url(${bg})`;
+            document.body.classList.add("custom-bg-active");
+        }
     } else {
         document.body.style.backgroundImage = "";
+        document.body.classList.remove("custom-bg-active");
         document.body.setAttribute("data-theme", t);
     }
     
@@ -50,11 +57,13 @@ async function initApp() {
             document.getElementById("user-display").innerText = `@${user.username || user.first_name || "Пользователь"}`;
             document.getElementById("bal-rub").innerText = user.balance_rub.toFixed(2);
             document.getElementById("bal-bonus").innerText = `${user.bonus_balance.toFixed(2)} ₽`;
-            document.getElementById("ref-link").value = `https://t.me/SwapPayBot?start=ref_${user.user_id}`; // Укажи тут юзернейм своего бота
+            
+            // Если используется прямой запуск в WebApp, линк может быть другим, но оставляем классический:
+            document.getElementById("ref-link").value = `https://t.me/SwapPay_Bot?start=ref_${user.user_id}`;
 
             if (user.role === "admin") document.getElementById("nav-admin").classList.remove("hidden");
             
-            // Логика перехода из бота напрямую к оставлению отзыва
+            // Парсинг ID заказа для отзыва из start_param
             const startParam = tg?.initDataUnsafe?.start_param;
             if (startParam && startParam.startsWith('review_')) {
                 currentReviewTxId = parseInt(startParam.split('_')[1]);
@@ -70,6 +79,7 @@ function changeTheme() {
         document.getElementById("custom-bg-input").click();
     } else {
         document.body.style.backgroundImage = "";
+        document.body.classList.remove("custom-bg-active");
         document.body.setAttribute("data-theme", t);
         localStorage.setItem("theme", t);
         localStorage.removeItem("custom_bg");
@@ -84,6 +94,7 @@ function loadCustomBg(input) {
             localStorage.setItem("theme", "custom");
             localStorage.setItem("custom_bg", b64);
             document.body.setAttribute("data-theme", "basic"); 
+            document.body.classList.add("custom-bg-active");
             document.body.style.backgroundImage = `url(${b64})`;
         };
         reader.readAsDataURL(input.files[0]);
@@ -101,9 +112,13 @@ function switchTab(tab) {
     clearInterval(chatInterval);
     
     if (tab === "support") {
-        document.getElementById("user-chat-box").innerHTML = ""; // Очищаем при входе на вкладку
+        // Очищаем локальный счетчик и сам DOM-контейнер при входе на вкладку
+        renderedMessagesCount = 0;
+        document.getElementById("user-chat-box").innerHTML = ""; 
         loadUserChat(); 
         chatInterval = setInterval(loadUserChat, 3000);
+    } else if (tab === "quests") {
+        loadQuests();
     } else if (tab === "admin") {
         loadAdminData();
     } else if (tab === "reviews") {
@@ -204,6 +219,31 @@ async function activatePromo() {
 
 function copyRef() { document.getElementById("ref-link").select(); document.execCommand("copy"); showToast("Ссылка скопирована!"); }
 
+// --------- ЗАДАНИЯ (QUESTS) ---------
+async function loadQuests() {
+    try {
+        const r = await fetch(`/api/quests?initData=${encodeURIComponent(tg?.initData || "")}`);
+        const d = await r.json();
+        const b = document.getElementById("quests-list");
+        b.innerHTML = "";
+        d.quests.forEach(q => {
+            let pct = Math.min((q.progress / q.max) * 100, 100);
+            b.innerHTML += `
+            <div class="pill" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <b style="font-size: 13px;">${q.title}</b>
+                    <span style="color: #10b981; font-weight: 800; font-size: 12px;">+${q.reward} ₽</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary);">${q.desc}</div>
+                <div style="width: 100%; background: var(--bg-body); border-radius: 10px; height: 6px; overflow: hidden; margin-top: 4px;">
+                    <div style="height: 100%; width: ${pct}%; background: var(--accent-main); border-radius: 10px;"></div>
+                </div>
+                <div style="font-size: 10px; text-align: right; color: var(--text-secondary);">${q.progress} / ${q.max}</div>
+            </div>`;
+        });
+    } catch (e) {}
+}
+
 // --------- ОТЗЫВЫ ---------
 async function loadReviews() {
     try {
@@ -231,43 +271,25 @@ function setReviewStars(num) {
     currentReviewStars = num;
     for(let i=1; i<=5; i++) {
         const starEl = document.getElementById(`star-${i}`);
-        if(i <= num) {
-            starEl.style.opacity = "1";
-            starEl.style.transform = "scale(1.2)";
-        } else {
-            starEl.style.opacity = "0.3";
-            starEl.style.transform = "scale(1)";
-        }
+        if(i <= num) { starEl.style.opacity = "1"; starEl.style.transform = "scale(1.2)"; } 
+        else { starEl.style.opacity = "0.3"; starEl.style.transform = "scale(1)"; }
     }
 }
 
 async function submitReview() {
-    if(!currentReviewTxId) return showToast("Отзыв можно оставить только перейдя по кнопке из уведомления об успешном заказе!");
+    if(!currentReviewTxId) return showToast("Отзыв можно оставить только перейдя по кнопке из уведомления!");
     const txt = document.getElementById("review-text").value;
     if(!txt) return showToast("Напишите текст отзыва!");
-    
     try {
         const r = await fetch("/api/reviews", { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json" }, 
-            body: JSON.stringify({ 
-                initData: tg?.initData || "", 
-                text: txt, 
-                stars: currentReviewStars, 
-                tx_id: currentReviewTxId 
-            }) 
+            method: "POST", headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ initData: tg?.initData || "", text: txt, stars: currentReviewStars, tx_id: currentReviewTxId }) 
         });
         const d = await r.json();
-        
         if (r.ok) {
-            showToast("Спасибо за ваш отзыв!");
-            closeModal("modal-review-add");
-            document.getElementById("review-text").value = "";
-            currentReviewTxId = null;
-            if (document.getElementById("view-reviews").classList.contains("active")) loadReviews();
-        } else {
-            showToast(d.detail || "Ошибка");
-        }
+            showToast("Спасибо за ваш отзыв!"); closeModal("modal-review-add"); document.getElementById("review-text").value = "";
+            currentReviewTxId = null; if (document.getElementById("view-reviews").classList.contains("active")) loadReviews();
+        } else showToast(d.detail || "Ошибка");
     } catch(e){ showToast("Ошибка соединения"); }
 }
 
@@ -278,6 +300,7 @@ async function loadUserChat() {
         const d = await r.json(); 
         const b = document.getElementById("user-chat-box");
         
+        // Управление состояниями (Закрыт/Открыт)
         if (d.status === 'closed') {
             document.getElementById("sup-status").innerText = "Диалог завершен"; 
             document.getElementById("user-chat-input-wrap").classList.add("hidden"); 
@@ -288,10 +311,9 @@ async function loadUserChat() {
             document.getElementById("btn-reopen-chat").classList.add("hidden");
         }
         
-        // Append-Only логика (добавляем только новые сообщения, чтобы не сбивать фокус ввода)
-        const currentCount = b.children.length;
-        if (d.messages.length > currentCount) {
-            for(let i = currentCount; i < d.messages.length; i++) {
+        // APPEND-ONLY: добавляем только НОВЫЕ сообщения
+        if (d.messages.length > renderedMessagesCount) {
+            for(let i = renderedMessagesCount; i < d.messages.length; i++) {
                 let m = d.messages[i];
                 let div = document.createElement('div');
                 div.className = `msg ${m.sender === 'user' ? 'right' : 'left'}`;
@@ -299,14 +321,31 @@ async function loadUserChat() {
                 b.appendChild(div);
             }
             b.scrollTop = b.scrollHeight;
+            renderedMessagesCount = d.messages.length; // Обновляем счетчик!
         }
     } catch (e) {}
 }
 
-function reopenChat() { 
-    document.getElementById("user-chat-input-wrap").classList.remove("hidden"); 
-    document.getElementById("btn-reopen-chat").classList.add("hidden"); 
-    document.getElementById("sup-status").innerText = "Новый диалог"; 
+function reopenChat() {
+    const btn = document.getElementById("btn-reopen-chat");
+    btn.disabled = true;
+    let secs = 10;
+    btn.innerText = `Подключение... ${secs}с`;
+    
+    // Задержка в 10 секунд перед открытием чата
+    const intv = setInterval(() => {
+        secs--;
+        btn.innerText = `Подключение... ${secs}с`;
+        if(secs <= 0) {
+            clearInterval(intv);
+            btn.classList.add("hidden");
+            btn.disabled = false;
+            btn.innerText = "Начать новый диалог";
+            
+            document.getElementById("user-chat-input-wrap").classList.remove("hidden");
+            document.getElementById("sup-status").innerText = "Новый диалог";
+        }
+    }, 1000);
 }
 
 async function sendMsgUser() {
@@ -352,15 +391,16 @@ async function adminExecSql() {
         const r = await fetch("/api/admin/sql", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: tg?.initData || "", query: query }) });
         const d = await r.json();
         const resBox = document.getElementById("adm-sql-res");
-        resBox.style.display = "block";
-        resBox.innerText = JSON.stringify(d, null, 2);
+        resBox.style.display = "block"; resBox.innerText = JSON.stringify(d, null, 2);
     } catch(e) {}
 }
 
 async function openAdminChat(uid, name) {
     activeAdminChatUser = uid; document.getElementById("view-admin").classList.remove("active");
     setTimeout(() => document.getElementById("view-admin-chat").classList.add("active"), 50);
+    
     clearInterval(chatInterval);
+    renderedAdminMessagesCount = 0; // Сбрасываем счетчик для админа
     document.getElementById("admin-chat-box").innerHTML = ""; // Очищаем старый чат перед открытием нового
     
     const fetchChat = async () => {
@@ -368,10 +408,9 @@ async function openAdminChat(uid, name) {
         const d = await r.json(); 
         const b = document.getElementById("admin-chat-box");
         
-        // Append-Only логика для админа
-        const currentCount = b.children.length;
-        if (d.messages.length > currentCount) {
-            for(let i = currentCount; i < d.messages.length; i++) {
+        // APPEND-ONLY для админа
+        if (d.messages.length > renderedAdminMessagesCount) {
+            for(let i = renderedAdminMessagesCount; i < d.messages.length; i++) {
                 let m = d.messages[i];
                 let div = document.createElement('div');
                 div.className = `msg ${m.sender === 'user' ? 'left' : 'right'}`;
@@ -379,6 +418,7 @@ async function openAdminChat(uid, name) {
                 b.appendChild(div);
             }
             b.scrollTop = b.scrollHeight;
+            renderedAdminMessagesCount = d.messages.length;
         }
     };
     fetchChat(); chatInterval = setInterval(fetchChat, 3000);
