@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <!-- Адаптация под мобильные устройства без возможности зума -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SwapPay</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -13,86 +14,118 @@
         body[data-theme="pink"] { --accent-main: #ec4899; --accent-grad1: #831843; --accent-grad2: #db2777; --bg-body: #1a0812; --bg-card: #2f0e20; --bg-inner: #4a1532; }
         body[data-theme="neon"] { --accent-main: #06b6d4; --accent-grad1: #083344; --accent-grad2: #0284c7; --bg-body: #020617; --bg-card: #0f172a; --bg-inner: #1e293b; }
         body[data-theme="joke"] { --accent-main: #eab308; --accent-grad1: #713f12; --accent-grad2: #ca8a04; --bg-body: #1c1917; --bg-card: #292524; --bg-inner: #44403c; }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; transition: background 0.3s ease, border-color 0.3s ease; }
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-body); color: var(--text-primary); padding: 12px 14px 80px; overflow-x: hidden; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: var(--bg-body);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: var(--text-primary); 
+            padding: 12px 14px 80px; 
+            overflow-x: hidden; 
+            min-height: 100vh;
+        }
 
         .view { opacity: 0; transform: translateX(20px); pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease; position: absolute; width: calc(100% - 28px); top: 12px; left: 14px; visibility: hidden; }
         .view.active { opacity: 1; transform: translateX(0); pointer-events: auto; position: relative; top: 0; left: 0; visibility: visible; }
+        
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .modal.active { opacity: 1; pointer-events: auto; }
-        .modal-content { width: 100%; max-width: 440px; background: var(--bg-card); border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .modal-content { width: 100%; max-width: 440px; background: var(--bg-card); border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); max-height: 90vh; overflow-y: auto;}
         .modal.active .modal-content { transform: translateY(0); }
 
+        /* Идеальное выравнивание и центрирование */
         .container { width: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
         .banner { background: linear-gradient(135deg, var(--accent-grad1), var(--accent-grad2)); border-radius: 18px; padding: 18px; position: relative; }
-        .card { background: var(--bg-card); border-radius: 18px; padding: 18px; border: 1px solid var(--border); }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .card { background: var(--bg-card); border-radius: 18px; padding: 18px; border: 1px solid var(--border); backdrop-filter: blur(10px); }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
+        
+        .btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
         .btn:active { transform: scale(0.97); }
         .btn.primary { background: linear-gradient(135deg, var(--accent-grad2), var(--accent-grad1)); border: none; }
         .btn.danger { background: #dc2626; border: none; }
         .btn:disabled { opacity: 0.5; pointer-events: none; }
+        
         .input-box { width: 100%; background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; color: #fff; margin-bottom: 10px; outline: none; }
-        .pill { background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .pill { background: var(--bg-inner); border: 1px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
         .pill.active { border-color: var(--accent-main); background: rgba(255,255,255,0.05); }
 
-        .chat-box { height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; scroll-behavior: smooth; }
-        .msg { max-width: 80%; padding: 10px 14px; font-size: 13.5px; }
+        .chat-box { height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; scroll-behavior: smooth; }
+        .msg { max-width: 80%; padding: 10px 14px; font-size: 13.5px; word-wrap: break-word; }
         .msg.left { align-self: flex-start; background: var(--bg-inner); border-radius: 0 14px 14px 14px; }
         .msg.right { align-self: flex-end; background: var(--accent-main); border-radius: 14px 0 14px 14px; }
-        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; }
-        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; }
+        
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; backdrop-filter: blur(10px); }
+        .nav-btn { background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .nav-btn.active { color: var(--accent-main); }
         .hidden { display: none !important; }
+
+        /* Всплывающие уведомления (Toast) */
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent-main); color: #fff; padding: 12px 20px; border-radius: 30px; font-size: 13px; font-weight: 600; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 90%; max-width: 350px;}
+        .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
+    <div id="toast" class="toast"></div>
+
     <div class="container">
         <!-- Главный экран -->
         <div id="view-home" class="view active">
             <div class="banner">
                 <h2 style="font-weight: 800; font-size: 22px;">SwapPay</h2>
                 <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;" id="user-display">Добро пожаловать</div>
-                <select id="theme-select" onchange="changeTheme()" style="position:absolute; right:15px; top:15px; background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:4px; outline:none; font-size: 12px;">
-                    <option value="basic">Базовая</option><option value="red">Красный</option><option value="purple">Фиолет</option>
-                    <option value="pink">Розовая</option><option value="neon">Неон</option><option value="joke">Угарная</option>
+                
+                <select id="theme-select" onchange="changeTheme()" style="position:absolute; right:15px; top:15px; background:rgba(0,0,0,0.3); color:#fff; border:none; border-radius:8px; padding:4px; outline:none; font-size: 12px; cursor: pointer;">
+                    <option value="basic">Базовая тема</option>
+                    <option value="red">Красная</option>
+                    <option value="purple">Фиолетовая</option>
+                    <option value="pink">Розовая</option>
+                    <option value="neon">Неон</option>
+                    <option value="custom">🖼 Свое фото</option>
                 </select>
+                <!-- Скрытый инпут для кастомного фона -->
+                <input type="file" id="custom-bg-input" accept="image/*" class="hidden" onchange="loadCustomBg(this)">
             </div>
             
-            <div class="card">
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="font-size: 12px; color: var(--text-secondary);">ОСНОВНОЙ БАЛАНС</span>
+            <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">ОСНОВНОЙ БАЛАНС</span>
                     <span id="role-badge" style="color: var(--accent-main); font-size: 11px; font-weight: 800;">USER</span>
                 </div>
-                <div style="font-size: 32px; font-weight: 800;"><span id="bal-rub">0.00</span> <span style="color:var(--accent-main);">₽</span></div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">Бонусы: <b id="bal-bonus" style="color:#10b981;">0.00 ₽</b></div>
+                <div style="font-size: 36px; font-weight: 800; margin: 5px 0;"><span id="bal-rub">0.00</span> <span style="color:var(--accent-main);">₽</span></div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Бонусы: <b id="bal-bonus" style="color:#10b981;">0.00 ₽</b></div>
             </div>
             
-            <!-- Гармоничная сетка кнопок -->
+            <!-- Выровненная сетка кнопок -->
             <div class="grid-2">
                 <button class="btn primary" onclick="openModal('modal-deposit')" style="grid-column: span 2;">💳 Пополнить баланс</button>
                 <button class="btn" onclick="openModal('modal-purchase', 'service')">🛍 Оплатить услугу</button>
                 <button class="btn" onclick="openModal('modal-purchase', 'usdt')">💎 Купить USDT</button>
                 <button class="btn" onclick="openModal('modal-referrals')">👥 Рефералы</button>
                 <button class="btn" onclick="openModal('modal-promo')">🎁 Промокод</button>
-                <button class="btn" onclick="openModal('modal-info')" style="grid-column: span 2;">ℹ️ Инфо / Курс</button>
-                <button class="btn danger" onclick="logout()" style="grid-column: span 2;">🚪 Выйти</button>
+                <button class="btn" onclick="openModal('modal-info')" style="grid-column: span 2;">ℹ️ Инфо / Оферта</button>
             </div>
         </div>
 
-        <!-- Поддержка (НЕТРОНУТО) -->
+        <!-- Поддержка -->
         <div id="view-support" class="view">
             <div class="card">
                 <h3 id="sup-status">Чат с поддержкой</h3>
                 <div class="chat-box" id="user-chat-box"></div>
-                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                
+                <!-- Кнопка возобновления чата -->
+                <button id="btn-reopen-chat" class="btn hidden" style="margin-top: 10px;" onclick="reopenChat()">Начать новый диалог</button>
+                
+                <div id="user-chat-input-wrap" style="display: flex; gap: 8px; margin-top: 10px;">
                     <input type="text" id="user-chat-input" class="input-box" style="margin:0;" placeholder="Сообщение...">
-                    <button class="btn primary" style="padding: 0 15px;" onclick="sendMsgUser()">➤</button>
+                    <button class="btn primary" style="padding: 0 15px; width: auto;" onclick="sendMsgUser()">➤</button>
                 </div>
             </div>
         </div>
 
-        <!-- Админка (НЕТРОНУТО) -->
+        <!-- Админка -->
         <div id="view-admin" class="view">
             <div class="card">
                 <h3>Активные обращения</h3>
@@ -100,7 +133,7 @@
             </div>
         </div>
 
-        <!-- Чат админки (НЕТРОНУТО) -->
+        <!-- Чат админки -->
         <div id="view-admin-chat" class="view">
             <div class="card">
                 <button class="btn" style="padding: 5px 10px; margin-bottom: 10px;" onclick="switchTab('admin')">🔙 Назад</button>
@@ -108,7 +141,7 @@
                 <div class="chat-box" id="admin-chat-box"></div>
                 <div style="display: flex; gap: 8px; margin-top: 10px;">
                     <input type="text" id="admin-chat-input" class="input-box" style="margin:0;">
-                    <button class="btn primary" style="padding: 0 15px;" onclick="sendMsgAdmin()">➤</button>
+                    <button class="btn primary" style="padding: 0 15px; width: auto;" onclick="sendMsgAdmin()">➤</button>
                 </div>
                 <div class="grid-2" style="margin-top: 10px;">
                     <button class="btn primary" style="font-size:12px; padding:10px;" onclick="closeSupportAdmin('resolved')">✅ Решено</button>
@@ -126,7 +159,7 @@
                 <span onclick="closeModal('modal-deposit')" style="cursor:pointer; font-size:20px;">✕</span>
             </div>
             <div class="pill active" onclick="setDep(this, 'crypto')">💎 CryptoBot (+40%)</div>
-            <div class="pill" onclick="setDep(this, 'kaspi')">🇰🇿 Kaspi Bank (8 KZT)</div>
+            <div class="pill" onclick="setDep(this, 'kaspi')">🇰🇿 Kaspi Bank (8.0 KZT)</div>
             <div class="pill" onclick="setDep(this, 'mono')">🇺🇦 Monobank (0.8 UAH)</div>
             <input type="number" id="dep-amt" class="input-box" placeholder="Сумма в рублях" oninput="calcDep()">
             <div id="dep-hint" style="font-size: 12px; color: var(--accent-main); margin-bottom: 10px;"></div>
@@ -134,7 +167,7 @@
                 <input type="file" id="dep-file" accept="application/pdf" style="display:none;" onchange="document.getElementById('dep-file-label').innerText = '✅ ' + this.files[0].name">
                 <div class="btn" style="border: 2px dashed rgba(255,255,255,0.2);" onclick="document.getElementById('dep-file').click()" id="dep-file-label">📄 Прикрепить чек (.PDF)</div>
             </div>
-            <button class="btn primary" id="btn-dep-submit" style="width: 100%;" onclick="depSubmit()">Перейти к оплате</button>
+            <button class="btn primary" id="btn-dep-submit" onclick="depSubmit()">Перейти к оплате</button>
         </div>
     </div>
 
@@ -146,10 +179,19 @@
             </div>
             <input type="hidden" id="pur-type" value="service">
             <div id="usdt-rate-box" class="hidden" style="font-size: 12px; color: var(--accent-main); margin-bottom: 10px; text-align: center;">Курс: 1 USDT = 95 ₽</div>
+            
             <input type="number" id="pur-amt" class="input-box" placeholder="Сумма в ₽" oninput="calcUsdt()">
             <div id="usdt-calc-hint" class="hidden" style="font-size: 12px; margin-bottom: 10px; text-align: right; color:#10b981;">Получите: 0 USDT</div>
+            
             <textarea id="pur-desc" class="input-box" placeholder="Ссылка или реквизиты услуги" style="height: 60px;"></textarea>
-            <button class="btn primary" id="btn-pur" style="width: 100%;" onclick="submitPurchase()">Создать заказ</button>
+            
+            <!-- Поле загрузки фото (например для QR СБП) -->
+            <div id="pur-photo-box" style="margin-bottom: 15px;">
+                <input type="file" id="pur-file" accept="image/*" style="display:none;" onchange="document.getElementById('pur-file-label').innerText = '✅ Фото загружено'">
+                <div class="btn" style="border: 2px dashed rgba(255,255,255,0.2);" onclick="document.getElementById('pur-file').click()" id="pur-file-label">📸 Прикрепить фото (QR/Реквизиты)</div>
+            </div>
+
+            <button class="btn primary" id="btn-pur" onclick="submitPurchase()">Создать заказ</button>
         </div>
     </div>
 
@@ -160,7 +202,7 @@
                 <span onclick="closeModal('modal-promo')" style="cursor:pointer; font-size:20px;">✕</span>
             </div>
             <input type="text" id="promo-input" class="input-box" placeholder="Введите промокод">
-            <button class="btn primary" style="width: 100%;" onclick="activatePromo()">Активировать</button>
+            <button class="btn primary" onclick="activatePromo()">Активировать</button>
         </div>
     </div>
 
@@ -174,7 +216,7 @@
                 Приглашайте друзей и получайте 5% от суммы их пополнений на свой бонусный баланс!
             </div>
             <input type="text" id="ref-link" class="input-box" readonly value="https://t.me/SwapPayBot?start=ref_">
-            <button class="btn primary" style="width: 100%;" onclick="copyRef()">Скопировать ссылку</button>
+            <button class="btn primary" onclick="copyRef()">Скопировать ссылку</button>
         </div>
     </div>
 
@@ -184,20 +226,22 @@
                 <h3>Информация и Курсы</h3>
                 <span onclick="closeModal('modal-info')" style="cursor:pointer; font-size:20px;">✕</span>
             </div>
-            <div class="card" style="margin-bottom: 10px;">
+            <div class="card" style="margin-bottom: 15px;">
                 <p>🇰🇿 1 ₽ = 8.0 KZT</p>
                 <p>🇺🇦 1 ₽ = 0.8 UAH</p>
                 <p>💎 USDT = 95 ₽</p>
                 <p style="font-size: 11px; color:var(--text-secondary); margin-top:5px;">*CryptoBot комиссия: +40%</p>
             </div>
+            <a href="https://telegra.ph/PUBLICHNAYA-OFERTA-SwapPay-08-09" target="_blank" style="text-decoration:none;">
+                <button class="btn">📄 Публичная Оферта</button>
+            </a>
         </div>
     </div>
 
-    <!-- Нижняя навигация (НЕТРОНУТО) -->
     <div class="nav">
-        <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">Кабинет</button>
-        <button class="nav-btn" id="nav-support" onclick="switchTab('support')">Поддержка</button>
-        <button class="nav-btn hidden" id="nav-admin" onclick="switchTab('admin')">Админка</button>
+        <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">🏠<br>Кабинет</button>
+        <button class="nav-btn" id="nav-support" onclick="switchTab('support')">💬<br>Поддержка</button>
+        <button class="nav-btn hidden" id="nav-admin" onclick="switchTab('admin')">🛡<br>Админка</button>
     </div>
 
     <script src="app.js"></script>
