@@ -16,7 +16,8 @@ import httpx
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN")
 LOG_CHAT_ID = os.getenv("LOG_CHAT_ID", "-5401409248")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/SwapPay_bot/app") # Замени на свою ссылку
+# Обновлен юзернейм бота
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://t.me/swapaapaaAPP_bot/app") 
 SUPER_ADMIN_ID = 7531770025
 DB_PATH = "bot_database.db"
 CRYPTO_RATE_MULTIPLIER = 1.4
@@ -183,13 +184,8 @@ async def tg_polling_worker():
                                     conn.close()
                             
                             elif text.startswith("/start"):
-                                # ИСправлено: теперь ссылка работает 100% как прямая ссылка на WebApp
-                                markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "web_app": {"url": os.getenv("DIRECT_WEBAPP_LINK", "https://your-domain.com/index.html") if not WEBAPP_URL.startswith("https://t.me") else WEBAPP_URL}}]]}
-                                # Если у вас WEBAPP_URL это ссылка t.me, то web_app кнопка ее не примет.
-                                # Поэтому мы делаем обычную url кнопку для t.me ссылок:
-                                if WEBAPP_URL.startswith("https://t.me"):
-                                    markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "url": WEBAPP_URL}]]}
-
+                                # Обновленная ссылка на @swapaapaaAPP_bot
+                                markup = {"inline_keyboard": [[{"text": "📱 Открыть SwapPay", "url": WEBAPP_URL}]]}
                                 welcome_text = (
                                     "👋 <b>Добро пожаловать в SwapPay!</b>\n\n"
                                     "Мы помогаем оплачивать покупки на RU маркетплейсах, "
@@ -236,7 +232,7 @@ async def tg_polling_worker():
                                     conn.commit()
                                     await answer_callback_query(cb_id, "Заказ выполнен!")
                                     
-                                    # ИСПРАВЛЕНИЕ: Используем 'url' вместо 'web_app', чтобы избежать ошибки BUTTON_URL_INVALID
+                                    # Отзыв через прямую ссылку url с параметром startapp
                                     review_markup = {"inline_keyboard": [[{"text": "⭐️ Оценить работу", "url": f"{WEBAPP_URL}?startapp=review_{tx_id}"}]]}
                                     user_msg = f"✅ <b>Ваш заказ #{tx_id} на сумму {tx['amount_rub']} ₽ успешно выполнен!</b>\n\nПожалуйста, уделите секунду и оставьте отзыв 👇"
                                     
@@ -409,11 +405,9 @@ async def add_review(request: Request):
     conn.commit(); conn.close()
     return {"status": "ok"}
 
-# НОВЫЙ ЭНДПОИНТ: Еженедельные задания (визуал)
 @app.get("/api/quests")
 async def get_quests(initData: str):
     validate_init_data(initData)
-    # Пока отдаем статику для фронтенда
     quests = [
         {"id": 1, "title": "Охотник за покупками", "desc": "Сделать заказы на сумму от 300 ₽", "reward": 50, "progress": 0, "max": 300},
         {"id": 2, "title": "Первый друг", "desc": "Пригласить друга, сделавшего 1 заказ", "reward": 25, "progress": 0, "max": 1},
